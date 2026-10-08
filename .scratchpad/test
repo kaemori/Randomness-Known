@@ -1,0 +1,422 @@
+private IEnumerator WorldGenerateTerrain()
+{
+	this.SetLoadingText("gencreatingterrain");
+	yield return null;
+	int tileCounter = 0;
+	if (this.biomeOverride == WorldGeneration.OverrideSceneType.Tutorial)
+	{
+		// tut
+	}
+	else if (this.biomeOverride == WorldGeneration.OverrideSceneType.Debug)
+	{
+		// dbg
+	}
+	else if (this.biomeDepth <= 1)
+	{
+		FastNoiseLite caveNoise = new FastNoiseLite(Random.Range(0, int.MaxValue));
+		caveNoise.SetNoiseType(FastNoiseLite.NoiseType.Cellular);
+		caveNoise.SetFrequency(0.06f);
+		caveNoise.SetFractalOctaves(3);
+		caveNoise.SetFractalType(FastNoiseLite.FractalType.FBm);
+		caveNoise.SetFractalLacunarity(1.5f);
+		FastNoiseLite dirtPerlinNoise = new FastNoiseLite(Random.Range(0, int.MaxValue));
+		dirtPerlinNoise.SetNoiseType(FastNoiseLite.NoiseType.Perlin);
+		dirtPerlinNoise.SetFractalType(FastNoiseLite.FractalType.FBm);
+		dirtPerlinNoise.SetFractalOctaves(7);
+		dirtPerlinNoise.SetFrequency(0.035f);
+		FastNoiseLite frequencyMap = new FastNoiseLite(Random.Range(0, int.MaxValue));
+		frequencyMap.SetNoiseType(FastNoiseLite.NoiseType.Perlin);
+		frequencyMap.SetFrequency(0.00037f);
+		FastNoiseLite biomeMap = new FastNoiseLite(Random.Range(0, int.MaxValue));
+		biomeMap.SetNoiseType(FastNoiseLite.NoiseType.Cellular);
+		biomeMap.SetFrequency(0.04f);
+		biomeMap.SetCellularDistanceFunction(FastNoiseLite.CellularDistanceFunction.EuclideanSq);
+		biomeMap.SetCellularReturnType(FastNoiseLite.CellularReturnType.Distance);
+		biomeMap.SetCellularJitter(1f);
+		biomeMap.SetFractalType(FastNoiseLite.FractalType.Ridged);
+		biomeMap.SetFractalLacunarity(1.5f);
+		int i = 0;
+		while ((long)i < (long)((ulong)this.width))
+		{
+			int num3 = 0;
+			while ((long)num3 < (long)((ulong)this.height))
+			{
+				caveNoise.SetFrequency(0.06f + frequencyMap.GetNoise((float)i, (float)num3) * 0.01f);
+				this.worldBlocks[i, num3] = ((caveNoise.GetNoise((float)i, (float)num3) > -0.715f) ? 1 : 0);
+				float noise = dirtPerlinNoise.GetNoise((float)i, (float)num3);
+				if (this.worldBlocks[i, num3] > 0 && noise < -0.1f)
+				{
+					this.worldBlocks[i, num3] = (((double)noise < -0.33) ? 16 : 2);
+				}
+				if (this.worldBlocks[i, num3] > 0 && Random.Range(0f, 1f) > 0.99f)
+				{
+					this.worldBlocks[i, num3] = (ushort)Random.Range(1, 5);
+				}
+				if (biomeMap.GetNoise((float)i, (float)num3) > 0.1f)
+				{
+					this.worldBlocks[i, num3] = (ushort)Random.Range(3, 5);
+				}
+				if (this.worldBlocks[i, num3] > 0 && biomeMap.GetNoise((float)i, (float)num3) < -0.8f)
+				{
+					this.worldBlocks[i, num3] = 15;
+				}
+				if (this.biomeDepth == 1 && (float)num3 < this.height * 0.5f)
+				{
+					float num4 = (float)num3 / this.height * 2f;
+					if (Random.Range(0f, 1f) > num4 && this.worldBlocks[i, num3] == 2)
+					{
+						this.worldBlocks[i, num3] = 12;
+					}
+					if ((float)num3 < this.height * 0.33f && Random.Range(0f, 1f) > num4 * 3f && this.worldBlocks[i, num3] == 1)
+					{
+						this.worldBlocks[i, num3] = 13;
+					}
+				}
+				num3++;
+			}
+			int num2 = tileCounter;
+			tileCounter = num2 + 1;
+			if (tileCounter > 100)
+			{
+				tileCounter = 0;
+				yield return null;
+			}
+			num2 = i;
+			i = num2 + 1;
+		}
+		this.GenerateOres();
+		float num5 = this.chunkWidth * this.chunkHeight * Random.Range(0.35f, 0.5f);
+		if (this.biomeDepth > 0)
+		{
+			num5 = this.chunkWidth * this.chunkHeight * Random.Range(0.35f, 0.5f);
+			int num6 = 0;
+			while ((float)num6 < num5)
+			{
+				Vector2Int vector2Int = new Vector2Int(Random.Range(0, (int)this.width), Random.Range(0, (int)this.height));
+				int num7 = Random.Range(6, 64);
+				for (int k = 0; k < num7; k++)
+				{
+					for (int l = 0; l < 3; l++)
+					{
+						if ((long)(vector2Int.x + k) < (long)((ulong)this.width) && (long)(vector2Int.y + l) < (long)((ulong)this.height))
+						{
+							this.worldBlocks[k + vector2Int.x, l + vector2Int.y] = 5;
+						}
+					}
+				}
+				num6++;
+			}
+			num5 = this.chunkWidth * this.chunkHeight * Random.Range(0.35f, 0.5f);
+			int num8 = 0;
+			while ((float)num8 < num5)
+			{
+				Vector2Int vector2Int2 = new Vector2Int(Random.Range(0, (int)this.width), Random.Range(0, (int)this.height));
+				int num9 = Random.Range(6, 60);
+				for (int m = 0; m < num9; m++)
+				{
+					for (int n = 0; n < 3; n++)
+					{
+						if ((long)(vector2Int2.x + n) < (long)((ulong)this.width) && (long)(vector2Int2.y + m) < (long)((ulong)this.height))
+						{
+							this.worldBlocks[n + vector2Int2.x, m + vector2Int2.y] = 5;
+						}
+					}
+				}
+				num8++;
+			}
+		}
+		else
+		{
+			num5 = this.chunkWidth * this.chunkHeight * Random.Range(0.35f, 0.4f);
+			int num10 = 0;
+			while ((float)num10 < num5)
+			{
+				Vector2Int vector2Int3 = new Vector2Int(Random.Range(0, (int)this.width), Random.Range(0, (int)this.height));
+				int num11 = Random.Range(6, 48);
+				for (int num12 = 0; num12 < num11; num12++)
+				{
+					for (int num13 = 0; num13 < 2; num13++)
+					{
+						if ((long)(vector2Int3.x + num12) < (long)((ulong)this.width) && (long)(vector2Int3.y + num13) < (long)((ulong)this.height))
+						{
+							this.worldBlocks[num12 + vector2Int3.x, num13 + vector2Int3.y] = 11;
+						}
+					}
+				}
+				num10++;
+			}
+			num5 = this.chunkWidth * this.chunkHeight * Random.Range(0.35f, 0.4f);
+			int num14 = 0;
+			while ((float)num14 < num5)
+			{
+				Vector2Int vector2Int4 = new Vector2Int(Random.Range(0, (int)this.width), Random.Range(0, (int)this.height));
+				int num15 = Random.Range(6, 48);
+				for (int num16 = 0; num16 < num15; num16++)
+				{
+					for (int num17 = 0; num17 < 2; num17++)
+					{
+						if ((long)(vector2Int4.x + num17) < (long)((ulong)this.width) && (long)(vector2Int4.y + num16) < (long)((ulong)this.height))
+						{
+							this.worldBlocks[num17 + vector2Int4.x, num16 + vector2Int4.y] = 11;
+						}
+					}
+				}
+				num14++;
+			}
+		}
+		this.UpdateWorld();
+		yield return this.WorldGenerateStructures();
+		if (this.biomeDepth == 0)
+		{
+			this.PlaceLiquids(128f, 1, 32);
+		}
+		else
+		{
+			this.PlaceLiquids(10f, 1, 400);
+			this.PlaceLiquids(18f, 2, 128);
+		}
+		caveNoise = null;
+		dirtPerlinNoise = null;
+		frequencyMap = null;
+		biomeMap = null;
+	}
+	else if (this.biomeDepth == 2 || this.biomeDepth == 3)
+	{
+		FastNoiseLite biomeMap = new FastNoiseLite(Random.Range(0, int.MaxValue));
+		biomeMap.SetNoiseType(FastNoiseLite.NoiseType.Value);
+		biomeMap.SetFrequency(0.086f);
+		biomeMap.SetFractalType(FastNoiseLite.FractalType.FBm);
+		biomeMap.SetFractalOctaves((this.biomeDepth == 2) ? 2 : 3);
+		biomeMap.SetFractalGain(0.49f);
+		biomeMap.SetFractalWeightedStrength(2.34f);
+		biomeMap.SetDomainWarpType(FastNoiseLite.DomainWarpType.OpenSimplex2);
+		biomeMap.SetDomainWarpAmp(22f);
+		FastNoiseLite frequencyMap = new FastNoiseLite(Random.Range(0, int.MaxValue));
+		frequencyMap.SetFrequency(0.006f);
+		FastNoiseLite dirtPerlinNoise = new FastNoiseLite(Random.Range(0, int.MaxValue));
+		dirtPerlinNoise.SetNoiseType(FastNoiseLite.NoiseType.Cellular);
+		dirtPerlinNoise.SetFrequency(0.02f);
+		dirtPerlinNoise.SetFractalType(FastNoiseLite.FractalType.Ridged);
+		dirtPerlinNoise.SetFractalGain(0.65f);
+		FastNoiseLite caveNoise = new FastNoiseLite(Random.Range(0, int.MaxValue));
+		caveNoise.SetFrequency(0.005f);
+		caveNoise.SetFractalType(FastNoiseLite.FractalType.PingPong);
+		caveNoise.SetFractalGain(0.35f);
+		caveNoise.SetDomainWarpType(FastNoiseLite.DomainWarpType.BasicGrid);
+		caveNoise.SetDomainWarpAmp(40f);
+		FastNoiseLite toxicNoise = new FastNoiseLite(Random.Range(0, int.MaxValue));
+		toxicNoise.SetFrequency(0.012f);
+		toxicNoise.SetFractalType(FastNoiseLite.FractalType.PingPong);
+		toxicNoise.SetFractalGain(0.3f);
+		toxicNoise.SetDomainWarpType(FastNoiseLite.DomainWarpType.BasicGrid);
+		toxicNoise.SetDomainWarpAmp(50f);
+		FastNoiseLite biomeMap2 = new FastNoiseLite(Random.Range(0, int.MaxValue));
+		biomeMap2.SetNoiseType(FastNoiseLite.NoiseType.Cellular);
+		biomeMap2.SetFrequency(0.05f);
+		biomeMap2.SetCellularDistanceFunction(FastNoiseLite.CellularDistanceFunction.EuclideanSq);
+		biomeMap2.SetCellularReturnType(FastNoiseLite.CellularReturnType.Distance);
+		biomeMap2.SetCellularJitter(1f);
+		biomeMap2.SetFractalType(FastNoiseLite.FractalType.Ridged);
+		biomeMap2.SetFractalLacunarity(1.5f);
+		FastNoiseLite marbleMap = new FastNoiseLite(Random.Range(0, int.MaxValue));
+		marbleMap.SetFrequency((this.biomeDepth == 2) ? 0.007f : 0.035f);
+		marbleMap.SetNoiseType(FastNoiseLite.NoiseType.Perlin);
+		marbleMap.SetDomainWarpType(FastNoiseLite.DomainWarpType.OpenSimplex2);
+		marbleMap.SetDomainWarpAmp(100f);
+		int i = 0;
+		float minMarble = ((this.biomeDepth == 2) ? 0.45f : 1f);
+		int j = 0;
+		while ((long)j < (long)((ulong)this.width))
+		{
+			int num18 = 0;
+			int num2;
+			while ((long)num18 < (long)((ulong)this.height))
+			{
+				float noise2 = biomeMap.GetNoise((float)j, (float)num18);
+				float num19 = frequencyMap.GetNoise((float)j, (float)num18) * 0.25f + 0.1f;
+				if (marbleMap.GetNoise((float)j, (float)num18) <= minMarble)
+				{
+					this.worldBlocks[j, num18] = ((noise2 > num19 && dirtPerlinNoise.GetNoise((float)j, (float)num18) < -0.4f) ? ((noise2 < num19 + 0.1f) ? 12 : 13) : 0);
+					if (caveNoise.GetNoise((float)j, (float)num18) > 0.65f)
+					{
+						this.worldBlocks[j, num18] = 17;
+					}
+					if (noise2 > 0.75f)
+					{
+						this.worldBlocks[j, num18] = 15;
+					}
+					if (biomeMap2.GetNoise((float)j, (float)num18) > 0.1f)
+					{
+						this.worldBlocks[j, num18] = (ushort)Random.Range(3, 5);
+					}
+					if (this.biomeDepth == 3 && this.worldBlocks[j, num18] > 0 && Random.value < 0.1f)
+					{
+						this.worldBlocks[j, num18] = (ushort)(15 + Random.Range(0, 2));
+					}
+				}
+				else
+				{
+					num2 = i;
+					i = num2 + 1;
+					this.worldBlocks[j, num18] = ((noise2 > num19) ? ((dirtPerlinNoise.GetNoise((float)j, (float)num18) < -0.1f) ? 18 : 19) : 0);
+					if (i > 100)
+					{
+						i = 0;
+						Object.Instantiate(Resources.Load("Special/marbleBackground"), this.BlockToWorldPos(new Vector2Int(j, num18)), Quaternion.Euler(0f, 0f, Random.value * 360f));
+					}
+				}
+				if (this.biomeDepth == 3 && toxicNoise.GetNoise((float)j, (float)num18) < -0.8f && Random.value > 0.5f)
+				{
+					this.worldBlocks[j, num18] = 22;
+				}
+				if (this.biomeDepth == 3 && this.worldBlocks[j, num18] > 0 && Random.value > (float)((long)num18 + (long)((ulong)this.halfHeight)) / this.height)
+				{
+					this.worldBlocks[j, num18] = 23;
+				}
+				num18++;
+			}
+			num2 = tileCounter;
+			tileCounter = num2 + 1;
+			if (tileCounter > 100)
+			{
+				tileCounter = 0;
+				yield return null;
+			}
+			num2 = j;
+			j = num2 + 1;
+		}
+		this.GenerateOres();
+		float num5 = this.chunkWidth * this.chunkHeight * Random.Range(0.25f, 0.3f);
+		int num20 = 0;
+		while ((float)num20 < num5)
+		{
+			Vector2Int vector2Int5 = new Vector2Int(Random.Range(0, (int)this.width), Random.Range(0, (int)this.height));
+			int num21 = Random.Range(6, 48);
+			for (int num22 = 0; num22 < num21; num22++)
+			{
+				for (int num23 = 0; num23 < 2; num23++)
+				{
+					if ((long)(vector2Int5.x + num22) < (long)((ulong)this.width) && (long)(vector2Int5.y + num23) < (long)((ulong)this.height))
+					{
+						this.worldBlocks[num22 + vector2Int5.x, num23 + vector2Int5.y] = 11;
+					}
+				}
+			}
+			num20++;
+		}
+		num5 = this.chunkWidth * this.chunkHeight * Random.Range(0.24f, 0.3f);
+		int num24 = 0;
+		while ((float)num24 < num5)
+		{
+			Vector2Int vector2Int6 = new Vector2Int(Random.Range(0, (int)this.width), Random.Range(0, (int)this.height));
+			int num25 = Random.Range(6, 48);
+			for (int num26 = 0; num26 < num25; num26++)
+			{
+				for (int num27 = 0; num27 < 2; num27++)
+				{
+					if ((long)(vector2Int6.x + num27) < (long)((ulong)this.width) && (long)(vector2Int6.y + num26) < (long)((ulong)this.height))
+					{
+						this.worldBlocks[num27 + vector2Int6.x, num26 + vector2Int6.y] = 11;
+					}
+				}
+			}
+			num24++;
+		}
+		if (this.biomeDepth == 3)
+		{
+			num5 = this.chunkWidth * this.chunkHeight * Random.Range(0.5f, 0.6f);
+			int num28 = 0;
+			while ((float)num28 < num5)
+			{
+				Vector2Int vector2Int7 = new Vector2Int(Random.Range(0, (int)this.width), Random.Range(0, (int)this.height));
+				int num29 = Random.Range(4, 16);
+				for (int num30 = 0; num30 < num29; num30++)
+				{
+					for (int num31 = 0; num31 < num29; num31++)
+					{
+						if ((long)(vector2Int7.x + num30) < (long)((ulong)this.width) && (long)(vector2Int7.y + num31) < (long)((ulong)this.height))
+						{
+							this.worldBlocks[num30 + vector2Int7.x, num31 + vector2Int7.y] = 20;
+						}
+					}
+				}
+				num28++;
+			}
+		}
+		this.UpdateWorld();
+		yield return this.WorldGenerateStructures();
+		this.PlaceLiquids(50f, 1, 26);
+		this.PlaceLiquids(15f, 3, 128);
+		biomeMap = null;
+		frequencyMap = null;
+		dirtPerlinNoise = null;
+		caveNoise = null;
+		toxicNoise = null;
+		biomeMap2 = null;
+		marbleMap = null;
+	}
+	else if (this.biomeDepth == 4)
+	{
+		FastNoiseLite marbleMap = new FastNoiseLite(Random.Range(0, int.MaxValue));
+		marbleMap.SetNoiseType(FastNoiseLite.NoiseType.Value);
+		marbleMap.SetFractalType(FastNoiseLite.FractalType.Ridged);
+		marbleMap.SetFractalOctaves(3);
+		marbleMap.SetFractalLacunarity(2.29f);
+		marbleMap.SetFractalGain(4f);
+		marbleMap.SetFractalWeightedStrength(1.2f);
+		marbleMap.SetDomainWarpType(FastNoiseLite.DomainWarpType.OpenSimplex2);
+		marbleMap.SetDomainWarpAmp(41f);
+		FastNoiseLite biomeMap2 = new FastNoiseLite(Random.Range(0, int.MaxValue));
+		biomeMap2.SetFrequency(0.02f);
+		biomeMap2.SetDomainWarpType(FastNoiseLite.DomainWarpType.OpenSimplex2);
+		biomeMap2.SetDomainWarpAmp(25f);
+		int i = 0;
+		while ((long)i < (long)((ulong)this.width))
+		{
+			int num32 = 0;
+			while ((long)num32 < (long)((ulong)this.height))
+			{
+				marbleMap.SetFrequency(0.0189f - (float)num32 / this.height * 0.002f);
+				float num33 = marbleMap.GetNoise((float)i, (float)num32) + Random.Range(-0.1f, 0.1f);
+				if (num33 > 0.15f && num33 < 0.25f)
+				{
+					this.worldBlocks[i, num32] = 23;
+				}
+				else if (num33 >= 0.25f && num33 < 0.45f)
+				{
+					this.worldBlocks[i, num32] = 16;
+				}
+				else if (num33 >= 0.45f && num33 < 0.66f)
+				{
+					this.worldBlocks[i, num32] = 15;
+				}
+				else if (num33 >= 0.66f)
+				{
+					this.worldBlocks[i, num32] = 19;
+				}
+				if (biomeMap2.GetNoise((float)i, (float)num32) < -0.735f)
+				{
+					this.worldBlocks[i, num32] = 0;
+				}
+				num32++;
+			}
+			int num2 = tileCounter;
+			tileCounter = num2 + 1;
+			if (tileCounter > 100)
+			{
+				tileCounter = 0;
+				yield return null;
+			}
+			num2 = i;
+			i = num2 + 1;
+		}
+		this.GenerateOres();
+		this.UpdateWorld();
+		yield return this.WorldGenerateStructures();
+		this.PlaceLiquids(30f, 1, 128);
+		this.PlaceLiquids(10f, 2, 50);
+		marbleMap = null;
+		biomeMap2 = null;
+	}
+	yield break;
+}
