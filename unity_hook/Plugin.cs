@@ -21,7 +21,7 @@ namespace ModNamespace
     public class Plugin : BaseUnityPlugin
     {
         public const string ModGUID = "com.rayleigh.urandom";
-        public const string ModName = "unrandom"; // To change .dll name, change the name in vars.targets
+        public const string ModName = "unrandom";
         public const string ModVersion = "0.0.1";
 
         internal static new ManualLogSource Logger;
@@ -37,18 +37,24 @@ namespace ModNamespace
             Logger.LogInfo($"Plugin {ModName} is loaded!");
 
             DoStuff();
-            ContentReloadManager.EnableHotReload(ModGUID); // Required for hot reload, put any registry registrations in the RegisterReloadable method below
+            ContentReloadManager.EnableHotReload(ModGUID);
             RegisterReloadable();
         }
 
         private void RegisterReloadable()
         {
-
+            // awa
         }
 
         private void DoStuff()
         {
+            PipeWriter.Init();
+        }
 
+        private void OnDestroy()
+        {
+            PipeWriter.Cleanup();
+            _harmony.UnpatchSelf();
         }
     }
 }
