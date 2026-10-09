@@ -485,3 +485,9 @@ $RECYCLE.BIN/
 # Build
 *.bin
 *.obj
+
+
+# user defined
+**/Assembly-CSharp/**
+!**/Assembly-CSharp/
+!**/Assembly-CSharp/**/*.md

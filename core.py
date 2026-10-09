@@ -40,12 +40,14 @@ def read_pipe():
 def raw_handle_pipe(msg):
     t = msg.get("type")
     if t == "boot":
-        print(f"[boot] unity {msg['unity_version']} | scene={msg['scene']}")
+        # print(f"[boot] unity {msg['unity_version']} | scene={msg['scene']}")
+        print("")
     elif t == "call":
         fn = msg["fn"]
         args = msg["args"]
         result = msg["result"]
         state = msg["state"]
+        stack = msg.get("stack", None)
 
         if fn == "random.insideunitcircle":
             import math
@@ -54,18 +56,37 @@ def raw_handle_pipe(msg):
             if abs(mag - 1.0) < 0.001:
                 fn = "random.insideunitcircle.normalized"
 
-        handle_random(fn, args, result, state)
+        handle_random(fn, args, result, state, stack)
 
 
 # randomness magic
 last_state = None
 
 
-def handle_random(fn, args, result, state):
-    logline = f"{fn} w/ {args} r:{result}, ({state})"
-    print(logline)
-    logfile.write(logline + "\n")
+def handle_random(fn, args, result, state, stack):
+    if stack is None:
+        stack = []
+
+    logline = (
+        f"[{time.time()}] {fn} w/ {args} r:{result}, ({state})\n{json.dumps(stack)}\n"
+    )
+    print(logline, end="")
+    logfile.write(logline)
 
 
 with open("pycore.log", "w") as logfile:
     read_pipe()  # calls handle_random
+
+# from static analysis
+# Body.HandleVisuals:3246 limb.transform.position += new vector3(random.range(-num5, num5), random.range(-num5, num5));
+# note: only runs when standing
+
+# num5:
+# +0.0004 * averagePain if averagePain > 75f  // pain
+# +0.025 if actualOpiateReception < -25f  // withdrawal (from num4)
+# +0.01 * (timeWasStill - 20f) if timeWasStill > 20f  // self harm events (from num4)
+# <add shake events (i.e. idle, water, cogpairment)> (from num4)
+# +0.025 if temperature < 32.5f  // shivering (from num4)
+
+# Talker.LateUpdate.cs:448 this.text.recttransform.position = (this.body ? (this.body.limbs[0].transform.position + vector3.up * 4f + random.insideunitcircle * this.body.averagepain * 0.0025f + vector3.back * 2.6f) : (base.transform.position + vector3.up * 3f + vector3.back * 2.6f));
+# runs every frame, cannot be skipped

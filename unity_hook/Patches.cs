@@ -30,6 +30,56 @@ namespace ModNamespace
         private static readonly System.Reflection.FieldInfo _s2Field;
         private static readonly System.Reflection.FieldInfo _s3Field;
 
+        private static JArray GetCallStack()
+        {
+            var stack = new System.Diagnostics.StackTrace(skipFrames: 2, fNeedFileInfo: true);
+            var frames = new JArray();
+            foreach (System.Diagnostics.StackFrame frame in stack.GetFrames())
+            {
+                var method = frame.GetMethod();
+                if (method == null) continue;
+
+                var ns = method.DeclaringType?.Namespace ?? "";
+                var typeName = method.DeclaringType?.Name ?? "";
+                var methodName = method.Name;
+
+                // Skip internals
+                if (ns.StartsWith("HarmonyLib") || ns.StartsWith("BepInEx") ||
+                    ns.StartsWith("System") || ns.StartsWith("MonoMod"))
+                    continue;
+
+                // Skip our own patch classes
+                if (ns == "ModNamespace")
+                    continue;
+
+                // Clean up DMD<ClassName::MethodName> → ClassName.MethodName
+                string label;
+                if (methodName.Contains("DMD<") && methodName.Contains("::"))
+                {
+                    // extract string inside <> pair and replace :: with .
+                    // i.e. WorldGeneration.DMD<WorldGeneration::Start> -> WorldGeneration.Start
+                    int start = methodName.IndexOf('<') + 1;
+                    int end = methodName.IndexOf('>');
+                    string inner = methodName.Substring(start, end - start);
+                    label = $"{inner.Replace("::", ".")}";
+                }
+                else
+                {
+                    label = $"{method.DeclaringType?.FullName}.{methodName}";
+                }
+
+                var fileName = frame.GetFileName();
+                var line = frame.GetFileLineNumber();
+                frames.Add(new JObject
+                {
+                    ["method"] = label,
+                });
+
+                if (frames.Count >= 20) break; // raised from 8
+            }
+            return frames;
+        }
+
         static PipeWriter()
         {
             var t = typeof(UnityEngine.Random.State);
@@ -171,6 +221,8 @@ namespace ModNamespace
                 ["fn"] = fn,
                 ["args"] = args,
                 ["result"] = result,
+                // ["stack"] = GetCallStack(),
+                ["stack"] = { },
                 ["state"] = GetState(),
             });
         }
