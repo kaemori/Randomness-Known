@@ -34,11 +34,6 @@
       <HintPath>$(GameAssembliesDir)/Assembly-CSharp.dll</HintPath>
     </Reference>
 
-    <Reference Include="CUCoreLib">
-      <HintPath>$(CUCoreLibDllPath)</HintPath>
-      <Private>false</Private>
-    </Reference>
-
     <Reference Include="UnityEngine.UI">
       <HintPath>$(GameAssembliesDir)/UnityEngine.UI.dll</HintPath>
     </Reference>
@@ -98,7 +93,5 @@
   <Target Name="ValidateTemplatePaths" BeforeTargets="ResolveReferences">
     <Error Condition="!Exists('$(GameAssembliesDir)/Assembly-CSharp.dll')"
            Text="Could not find Assembly-CSharp.dll. Update BaseGamePath in vars.targets or pass /p:BaseGamePath=... when building." />
-    <Error Condition="'$(CUCoreLibDllPath)' == '' or !Exists('$(CUCoreLibDllPath)')"
-           Text="Could not find CUCoreLib.dll. Update CUCoreLibDllPath in vars.targets or install/build CUCoreLib first." />
   </Target>
 </Project>

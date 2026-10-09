@@ -121,28 +121,4 @@
     <BepInExDir Condition="'$(BepInExDir)' == '' and '$(BaseGamePath)' != ''">$(BaseGamePath)\BepInEx</BepInExDir>
     <GameAssembliesDir Condition="'$(GameAssembliesDir)' == '' and '$(BaseGamePath)' != ''">$(BaseGamePath)\CasualtiesUnknown_Data\Managed</GameAssembliesDir>
   </PropertyGroup>
-
-  <Choose>
-    <When Condition="'$(CUCoreLibDllPath)' != ''" />
-    <When Condition="'$(BepInExDir)' != '' and Exists('$(BepInExDir)\plugins\CUCoreLib.dll')">
-      <PropertyGroup>
-        <CUCoreLibDllPath>$(BepInExDir)\plugins\CUCoreLib.dll</CUCoreLibDllPath>
-      </PropertyGroup>
-    </When>
-    <When Condition="'$(BepInExDir)' != '' and Exists('$(BepInExDir)\plugins\CUCoreLib\CUCoreLib.dll')">
-      <PropertyGroup>
-        <CUCoreLibDllPath>$(BepInExDir)\plugins\CUCoreLib\CUCoreLib.dll</CUCoreLibDllPath>
-      </PropertyGroup>
-    </When>
-    <When Condition="Exists('$(MSBuildThisFileDirectory)..\CUCoreLib\bin\Debug\CUCoreLib.dll')">
-      <PropertyGroup>
-        <CUCoreLibDllPath>$(MSBuildThisFileDirectory)..\CUCoreLib\bin\Debug\CUCoreLib.dll</CUCoreLibDllPath>
-      </PropertyGroup>
-    </When>
-    <When Condition="Exists('$(MSBuildThisFileDirectory)..\CUCoreLib\bin\Release\CUCoreLib.dll')">
-      <PropertyGroup>
-        <CUCoreLibDllPath>$(MSBuildThisFileDirectory)..\CUCoreLib\bin\Release\CUCoreLib.dll</CUCoreLibDllPath>
-      </PropertyGroup>
-    </When>
-  </Choose>
 </Project>
