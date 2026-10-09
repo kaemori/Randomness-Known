@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from csharp_syntax import find_calls_in_lines, is_line_function
-from function_getter import (
+from helpers.csharp_syntax import find_calls_in_lines, is_line_function
+from helpers.function_getter import (
     EntryPoint,
     get_function_body,
     load_modules,
@@ -9,7 +9,7 @@ from function_getter import (
 )
 from check_overloads import write_overload_registry, read_overload_registry
 
-from logging_helper import logger
+from helpers.logging_helper import logger
 
 DECOMPILED_PATH = Path(__file__).parent / "Assembly-CSharp"
 OVERLOAD_PATH = Path(__file__).parent / "overload_reg.json"

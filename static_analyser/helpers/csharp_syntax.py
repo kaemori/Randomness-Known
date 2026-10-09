@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from cs_parser import CS_LANG, _parser, find_nodes
+from helpers.cs_parser import _parser, find_nodes
 
 logger = logging.getLogger(f"jarvis.{__name__}")
 
@@ -73,7 +73,7 @@ def get_method_declarations(path: Path) -> List[MethodDecl]:
     with its 0-indexed start line.  Much faster than calling is_line_function
     per line because the file is parsed once.
     """
-    from cs_parser import get_tree
+    from helpers.cs_parser import get_tree
 
     tree = get_tree(path)
     results: List[MethodDecl] = []

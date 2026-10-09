@@ -3,12 +3,12 @@
 from pathlib import Path
 import re
 
-from function_getter import (
+from helpers.function_getter import (
     load_modules,
     load_module_index,
 )
 
-from logging_helper import logger
+from helpers.logging_helper import logger
 
 DECOMPILED_PATH = Path(__file__).parent / "Assembly-CSharp"
 ALL_MODULES = load_modules(DECOMPILED_PATH)

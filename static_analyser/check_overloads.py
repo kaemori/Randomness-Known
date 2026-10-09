@@ -1,15 +1,15 @@
 import json
 from pathlib import Path
 
-from function_getter import (
+from helpers.function_getter import (
     find_function_lines,
     get_function_body,
     load_modules,
     load_module_index,
 )
-from csharp_syntax import find_calls_in_lines
+from helpers.csharp_syntax import find_calls_in_lines
 
-from logging_helper import logger
+from helpers.logging_helper import logger
 
 DECOMPILED_PATH = Path(__file__).parent / "Assembly-CSharp"
 ALL_MODULES = load_modules(DECOMPILED_PATH)

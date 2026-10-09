@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from csharp_syntax import get_method_declarations
+from helpers.csharp_syntax import get_method_declarations
 
-DECOMPILED_PATH = Path(__file__).parent / "Assembly-CSharp"
+DECOMPILED_PATH = Path(__file__).parent.parent / "Assembly-CSharp"
 
 
 def load_modules(decompiled_path: str | Path = DECOMPILED_PATH) -> Dict[str, Path]:

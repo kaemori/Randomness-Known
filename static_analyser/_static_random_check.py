@@ -1,7 +1,7 @@
 from pathlib import Path
 import re
 
-from function_getter import (
+from helpers.function_getter import (
     load_modules,
     load_module_index,
     get_function_body,
