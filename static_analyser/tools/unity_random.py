@@ -22,16 +22,16 @@ class UnityRandom:
     @staticmethod
     def xorshift128(s0, s1, s2, s3):
         t = s0
-        t = (t ^ (t << 11)) & MASK  # a = 11
-        t = (t ^ (t >> 8)) & MASK  # b = 8
-        t = (t ^ s3 ^ (s3 >> 19)) & MASK  # c = 19
+        t = (t ^ (t << 11)) & MASK
+        t = (t ^ (t >> 8)) & MASK
+        t = (t ^ s3 ^ (s3 >> 19)) & MASK
         return s1, s2, s3, t
 
     def _next(self):
         t = self.s0
-        t = (t ^ (t << 11)) & MASK  # a = 11
-        t = (t ^ (t >> 8)) & MASK  # b = 8
-        t = (t ^ self.s3 ^ (self.s3 >> 19)) & MASK  # c = 19
+        t = (t ^ (t << 11)) & MASK
+        t = (t ^ (t >> 8)) & MASK
+        t = (t ^ self.s3 ^ (self.s3 >> 19)) & MASK
         self.s0, self.s1, self.s2, self.s3 = self.s1, self.s2, self.s3, t
         return t
 
@@ -44,6 +44,13 @@ class UnityRandom:
         return {f"s{i}": st for i, st in zip(range(4), self._state)}
 
     # larping
+    def _peek(self):
+        t = self.s0
+        t = (t ^ (t << 11)) & MASK
+        t = (t ^ (t >> 8)) & MASK
+        t = (t ^ self.s3 ^ (self.s3 >> 19)) & MASK
+        return to_f32((t & 0x7FFFFF) / 0x7FFFFF)
+
     def value(self):
         return to_f32((self._next() & 0x7FFFFF) / 0x7FFFFF)
 
@@ -55,8 +62,3 @@ class UnityRandom:
         if span == 0:
             return min_inclusive
         return min_inclusive + int(self.value() * span)
-
-
-prestate = [794495536, 2124554959, 1609843594, 2324523346]
-gamerand = UnityRandom(prestate)
-print(gamerand.value())

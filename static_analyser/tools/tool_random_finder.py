@@ -1,7 +1,9 @@
+# simple script to check for random usage in a specific function
+
 from pathlib import Path
 import re
 
-from helpers.function_getter import (
+from static_analyser.helpers.function_getter import (
     load_modules,
     load_module_index,
     get_function_body,

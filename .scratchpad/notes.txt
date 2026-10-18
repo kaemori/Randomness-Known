@@ -1,3 +1,0 @@
-FOR GenerateWorld()
-WorldPreprocess() has 0 random calls
-WorldCreateBackground() has 408 random calls, layer 0

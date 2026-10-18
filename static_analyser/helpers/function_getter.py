@@ -11,6 +11,7 @@ DECOMPILED_PATH = Path(__file__).parent.parent / "Assembly-CSharp"
 
 def load_modules(decompiled_path: str | Path = DECOMPILED_PATH) -> Dict[str, Path]:
     """Return {module_name: path} for every .cs file in *decompiled_path*."""
+    print("loading modules...")
     decompiled_path = Path(decompiled_path)
     return {file.stem: file for file in decompiled_path.glob("*.cs")}
 
@@ -25,8 +26,11 @@ def load_module_index(modules: Dict[str, Path]) -> ModuleIndex:
 
     Call once at startup; pass the result to all helpers below.
     """
+    print("indexing...")
     index: ModuleIndex = {}
-    for module_name, path in modules.items():
+    for i, v in enumerate(modules.items()):
+        module_name, path = v
+        # print(f"  {i+1}/{len(modules)}: {module_name}")
         decls = get_method_declarations(path)
         func_map: Dict[str, List[int]] = {}
         for decl in decls:
