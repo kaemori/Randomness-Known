@@ -36,6 +36,28 @@ def _filter_expr_stmt(lines, indent, node):
     emit(lines, indent, expr_to_str(node.expr))
 
 
+def _noise_setting(lines, indent, node):
+    arg = expr_to_str(node.args[0])
+    match node.method:
+        case "SetNoiseType":
+            emit(
+                lines,
+                indent,
+                f"{node.noise_var}.noise_type = {arg.replace("FastNoiseLite.NoiseType", "NoiseType.NoiseType_")}",
+            )
+        case "SetFrequency":
+            emit(lines, indent, f"{node.noise_var}.frequency = {arg}")
+        case "SetAmplitude":
+            emit(lines, indent, f"{node.noise_var}.amplitude = {arg}")
+        case "SetLacunarity":
+            emit(lines, indent, f"{node.noise_var}.lacunarity = {arg}")
+        case "SetPersistence":
+            emit(lines, indent, f"{node.noise_var}.persistence = {arg}")
+
+        case _:
+            emit(lines, indent, f"# {node.noise_var}.{node.method}({arg})")
+
+
 def convert_stmt(node, lines, indent):
     kind = type(node).__name__
 
@@ -76,8 +98,7 @@ def convert_stmt(node, lines, indent):
                 convert_stmt(setting, lines, indent)
 
         case NoiseSetting():
-            args = ", ".join(expr_to_str(a) for a in node.args)
-            emit(lines, indent, f"{node.noise_var}.{node.method}({args})")
+            _noise_setting(lines, indent, node)
 
         case NoiseConfigure():
             # print(node)
@@ -127,7 +148,11 @@ def convert_forloop(forloop, lines, indent):
 
 def convert_function(func):
     lines = []
-    prefix = "async def" if func.is_coroutine else "def"
+    # prefix = "async def" if func.is_coroutine else "def"
+    prefix = "def"
+    emit(
+        lines, 0, "from pyfastnoiselite.pyfastnoiselite import FastNoiseLite, NoiseType"
+    )
     emit(lines, 0, f"{prefix} {func.name}(self):")
     convert_block(func.body, lines, 1)
 
