@@ -23,8 +23,10 @@ if biomeDepth <= 1:
     biomeMap.cellular_jitter = 1.0
     biomeMap.fractal_type = FractalType.FractalType_Ridged
     biomeMap.fractal_lacunarity = 1.5
-    for i in range(for_fixer(width)):
-        for num3 in range(for_fixer(height)):
+    i = 0
+    while i < width:
+        num3 = 0
+        while num3 < height:
             caveNoise.frequency = 0.06 + frequencyMap.get_noise(i, num3) * 0.01
             worldBlocks[i, num3] = (1 if (caveNoise.get_noise(i, num3) > -0.715) else 0)
             noise = dirtPerlinNoise.get_noise(i, num3)
@@ -42,46 +44,72 @@ if biomeDepth <= 1:
                     worldBlocks[i, num3] = 12
                 if num3 < height * 0.33 and Random.Range(0.0, 1.0) > num4 * 3.0 and worldBlocks[i, num3] == 1:
                     worldBlocks[i, num3] = 13
+            num3 += 1
         num2 = tileCounter
         tileCounter = num2 + 1
         if tileCounter > 100:
             tileCounter = 0
+        i += 1
     GenerateOres()
     num5 = chunkWidth * chunkHeight * Random.Range(0.35, 0.5)
     if biomeDepth > 0:
         num5 = chunkWidth * chunkHeight * Random.Range(0.35, 0.5)
-        for num6 in range(for_fixer(num5)):
+        num6 = 0
+        while num6 < num5:
             vector2Int = (Random.Range(0, width), Random.Range(0, height))
             num7 = Random.Range(6, 64)
-            for k in range(for_fixer(num7)):
-                for l in range(for_fixer(3)):
+            k = 0
+            while k < num7:
+                l = 0
+                while l < 3:
                     if (vector2Int[0] + k) < (width) and (vector2Int[1] + l) < (height):
                         worldBlocks[k + vector2Int[0], l + vector2Int[1]] = 5
+                    l += 1
+                k += 1
+            num6 += 1
         num5 = chunkWidth * chunkHeight * Random.Range(0.35, 0.5)
-        for num8 in range(for_fixer(num5)):
+        num8 = 0
+        while num8 < num5:
             vector2Int2 = (Random.Range(0, width), Random.Range(0, height))
             num9 = Random.Range(6, 60)
-            for m in range(for_fixer(num9)):
-                for n in range(for_fixer(3)):
+            m = 0
+            while m < num9:
+                n = 0
+                while n < 3:
                     if (vector2Int2[0] + n) < (width) and (vector2Int2[1] + m) < (height):
                         worldBlocks[n + vector2Int2[0], m + vector2Int2[1]] = 5
+                    n += 1
+                m += 1
+            num8 += 1
     else:
         num5 = chunkWidth * chunkHeight * Random.Range(0.35, 0.4)
-        for num10 in range(for_fixer(num5)):
+        num10 = 0
+        while num10 < num5:
             vector2Int3 = (Random.Range(0, width), Random.Range(0, height))
             num11 = Random.Range(6, 48)
-            for num12 in range(for_fixer(num11)):
-                for num13 in range(for_fixer(2)):
+            num12 = 0
+            while num12 < num11:
+                num13 = 0
+                while num13 < 2:
                     if (vector2Int3[0] + num12) < (width) and (vector2Int3[1] + num13) < (height):
                         worldBlocks[num12 + vector2Int3[0], num13 + vector2Int3[1]] = 11
+                    num13 += 1
+                num12 += 1
+            num10 += 1
         num5 = chunkWidth * chunkHeight * Random.Range(0.35, 0.4)
-        for num14 in range(for_fixer(num5)):
+        num14 = 0
+        while num14 < num5:
             vector2Int4 = (Random.Range(0, width), Random.Range(0, height))
             num15 = Random.Range(6, 48)
-            for num16 in range(for_fixer(num15)):
-                for num17 in range(for_fixer(2)):
+            num16 = 0
+            while num16 < num15:
+                num17 = 0
+                while num17 < 2:
                     if (vector2Int4[0] + num17) < (width) and (vector2Int4[1] + num16) < (height):
                         worldBlocks[num17 + vector2Int4[0], num16 + vector2Int4[1]] = 11
+                    num17 += 1
+                num16 += 1
+            num14 += 1
     UpdateWorld()
     WorldGenerateStructures()  # was yield statement
     if biomeDepth == 0:
@@ -137,8 +165,10 @@ elif biomeDepth == 2 or biomeDepth == 3:
     # marbleMap.SetDomainWarpAmp(100.0)
     i = 0
     minMarble = (0.45 if (biomeDepth == 2) else 1.0)
-    for j in range(for_fixer(width)):
-        for num18 in range(for_fixer(height)):
+    j = 0
+    while j < width:
+        num18 = 0
+        while num18 < height:
             noise2 = biomeMap.get_noise(j, num18)
             num19 = frequencyMap.get_noise(j, num18) * 0.25 + 0.1
             if marbleMap.get_noise(j, num18) <= minMarble:
@@ -161,35 +191,55 @@ elif biomeDepth == 2 or biomeDepth == 3:
                 worldBlocks[j, num18] = 22
             if biomeDepth == 3 and worldBlocks[j, num18] > 0 and Random.value > (num18 + (halfHeight)) / height:
                 worldBlocks[j, num18] = 23
+            num18 += 1
         tileCounter += 1
         if tileCounter > 100:
             tileCounter = 0
+        j += 1
     GenerateOres()
     num5 = chunkWidth * chunkHeight * Random.Range(0.25, 0.3)
-    for num20 in range(for_fixer(num5)):
+    num20 = 0
+    while num20 < num5:
         vector2Int5 = (Random.Range(0, width), Random.Range(0, height))
         num21 = Random.Range(6, 48)
-        for num22 in range(for_fixer(num21)):
-            for num23 in range(for_fixer(2)):
+        num22 = 0
+        while num22 < num21:
+            num23 = 0
+            while num23 < 2:
                 if (vector2Int5[0] + num22) < (width) and (vector2Int5[1] + num23) < (height):
                     worldBlocks[num22 + vector2Int5[0], num23 + vector2Int5[1]] = 11
+                num23 += 1
+            num22 += 1
+        num20 += 1
     num5 = chunkWidth * chunkHeight * Random.Range(0.24, 0.3)
-    for num24 in range(for_fixer(num5)):
+    num24 = 0
+    while num24 < num5:
         vector2Int6 = (Random.Range(0, width), Random.Range(0, height))
         num25 = Random.Range(6, 48)
-        for num26 in range(for_fixer(num25)):
-            for num27 in range(for_fixer(2)):
+        num26 = 0
+        while num26 < num25:
+            num27 = 0
+            while num27 < 2:
                 if (vector2Int6[0] + num27) < (width) and (vector2Int6[1] + num26) < (height):
                     worldBlocks[num27 + vector2Int6[0], num26 + vector2Int6[1]] = 11
+                num27 += 1
+            num26 += 1
+        num24 += 1
     if biomeDepth == 3:
         num5 = chunkWidth * chunkHeight * Random.Range(0.5, 0.6)
-        for num28 in range(for_fixer(num5)):
+        num28 = 0
+        while num28 < num5:
             vector2Int7 = (Random.Range(0, width), Random.Range(0, height))
             num29 = Random.Range(4, 16)
-            for num30 in range(for_fixer(num29)):
-                for num31 in range(for_fixer(num29)):
+            num30 = 0
+            while num30 < num29:
+                num31 = 0
+                while num31 < num29:
                     if (vector2Int7[0] + num30) < (width) and (vector2Int7[1] + num31) < (height):
                         worldBlocks[num30 + vector2Int7[0], num31 + vector2Int7[1]] = 20
+                    num31 += 1
+                num30 += 1
+            num28 += 1
     UpdateWorld()
     WorldGenerateStructures()  # was yield statement
     PlaceLiquids(50.0, 1, 26)
@@ -215,8 +265,10 @@ elif biomeDepth == 4:
     biomeMap2.frequency = 0.02
     # biomeMap2.SetDomainWarpType(FastNoiseLite.DomainWarpType.OpenSimplex2)
     # biomeMap2.SetDomainWarpAmp(25.0)
-    for i in range(for_fixer(width)):
-        for num32 in range(for_fixer(height)):
+    i = 0
+    while i < width:
+        num32 = 0
+        while num32 < height:
             marbleMap.frequency = 0.0189 - num32 / height * 0.002
             num33 = marbleMap.get_noise(i, num32) + Random.Range(-0.1, 0.1)
             if num33 > 0.15 and num33 < 0.25:
@@ -229,10 +281,12 @@ elif biomeDepth == 4:
                 worldBlocks[i, num32] = 19
             if biomeMap2.get_noise(i, num32) < -0.735:
                 worldBlocks[i, num32] = 0
+            num32 += 1
         num2 = tileCounter
         tileCounter = num2 + 1
         if tileCounter > 100:
             tileCounter = 0
+        i += 1
     GenerateOres()
     UpdateWorld()
     WorldGenerateStructures()  # was yield statement

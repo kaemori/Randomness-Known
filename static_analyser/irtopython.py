@@ -159,14 +159,14 @@ def convert_ifchain(ifchain, lines, indent):
 
 
 def convert_forloop(forloop, lines, indent):
-    loopvar, limit = forloop.condition.raw.split(" < ")
-    emit(
-        lines,
-        indent,
-        f"for {loopvar} in range(for_fixer({limit})):",
-    )
-    #
+    if forloop.init is not None:
+        convert_stmt(forloop.init, lines, indent)
+
+    emit(lines, indent, f"while {expr_to_str(forloop.condition)}:")
     convert_block(forloop.body, lines, indent + 1)
+
+    if forloop.update is not None:
+        convert_stmt(forloop.update, lines, indent + 1)
 
 
 def convert_function(func):
@@ -225,9 +225,10 @@ if __name__ == "__main__":
 
     genterr_function_body = clean_up_function(genterr_function_body)
     ir = transpile(genterr_function_body)
+    print(ir)
     python_file = convert_function(ir)
 
     output = Path().cwd() / "rawr.py"
     with open(output, "w") as w:
         print(python_file, file=w)
-    print(black.format_file_in_place(output, fast=False, mode=black.FileMode()))
+    # print(black.format_file_in_place(output, fast=False, mode=black.FileMode()))
