@@ -369,7 +369,7 @@ def RawExprTrue():
     return RawExpr(raw="true")
 
 
-def transpile(lines, func_name="WorldGenerateTerrain", is_coroutine=True):
+def transpile(lines, func_name, is_coroutine=True):
     lines = list(lines)
     idx = 0
     while idx < len(lines) and lines[idx].strip() == "":

@@ -19,9 +19,7 @@ MODULE_INDEX = cache_output(load_module_index, ALL_MODULES)
 
 # holy shit device name leak??
 ICON_PATH = Path("/home/fern/casualties_unknown_assets/Assets/Texture2D")
-HARDCODED_PATH = Path(
-    "/home/fern/Stuff/Code/python_code/randomness_known/static_analyser/tools/hardcodedimages"
-)
+HARDCODED_PATH = Path().cwd() / "tools" / "hardcodedimages"
 
 
 # grab block ref
@@ -93,6 +91,29 @@ def get_id_color_mapping(block_info):
             id_color_mapping[block_id] = _avg_color(
                 HARDCODED_PATH / f"{block_name}.png"
             )
+        except Exception as e:
+            print(f"failed to get {block_name}")
+            raise e
+
+    return id_color_mapping
+
+
+def get_id_image_mapping(block_info):
+    import matplotlib.image as mpimg
+    from PIL import Image
+
+    air_img = Image.new("RGB", (8, 8), (20, 20, 35))
+
+    id_color_mapping = {"air": air_img}
+    for block_id, block_name in block_info.items():
+        if block_name in id_color_mapping:
+            continue
+        try:
+            with Image.open(HARDCODED_PATH / f"{block_name}.png") as img:
+                img = img.convert("RGB")
+                img = img.resize((8, 8), Image.BILINEAR)
+                id_color_mapping[block_id] = img
+
         except Exception as e:
             print(f"failed to get {block_name}")
             raise e

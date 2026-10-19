@@ -2,7 +2,7 @@ import regex
 
 from cparser.ir_nodes import *
 from cparser.transpiler import KNOWN_TYPES
-from functools import reduce
+from tools.collect_ternery import _fix_ternary_once
 
 INDENT = "    "
 
@@ -138,7 +138,7 @@ def convert_vardecl(node, lines, indent):
     elif op == "--":
         emit(lines, indent, f"{target} -= 1")
     elif op:
-        emit(lines, indent, f"{target} {op}= {expr_to_str(node.value)}")
+        emit(lines, indent, f"{target} {op} {expr_to_str(node.value)}")
     else:
         emit(lines, indent, f"{target} = {expr_to_str(node.value)}")
 
@@ -169,16 +169,14 @@ def convert_forloop(forloop, lines, indent):
         convert_stmt(forloop.update, lines, indent + 1)
 
 
-def convert_function(func):
+def convert_function(func, danger_make_returns_sysexit=False):
     lines = []
     emit(lines, 0, "for_fixer = lambda x: math.ceil(x) if isinstance(x, float) else x")
     convert_block(func.body, lines, 0)
 
-    trinary = regex.compile(
-        r"(?P<ternary>\((?P<cond>(?:[^()?:]|(?P>paren))*+)\s*\?\s*(?P<then>(?:[^()?:]|(?P>paren))*+)\s*:\s*(?P<else>(?:[^()?:]|(?P>paren))*+)\))(?(DEFINE)(?P<paren>\((?:(?P>ternary)|[^()]|(?P>paren))*+\)))"
-    )
     litintfloat = regex.compile(r"\b((?<!\.)\d+(?!\.))f\b")
     litfloat = regex.compile(r"(-?[0-9]+(?:\.[0-9]+)?)f")
+    litintsuffix = regex.compile(r"\b(\d+)(?:[uU]|[lL]|[uU][lL]|[lL][uU])\b")
 
     file = "\n".join(lines)
 
@@ -189,12 +187,17 @@ def convert_function(func):
     file = file.replace("new Vector2Int", "")
     file = file.replace("null", "None")
     file = file.replace("int.MaxValue", "0x7FFFFFFF")
+    file = file.replace(".GetNoise", ".get_noise")
+    file = regex.sub(litintsuffix, r"\1", file)
     file = regex.sub(litintfloat, r"\1.0", file)
     file = regex.sub(litfloat, r"\1", file)
-    for _ in range(3):
-        file = regex.sub(trinary, r"(\g<then>if \g<cond>else \g<else>)", file)
+    for _ in range(5):
+        file = _fix_ternary_once(file)
     file = regex.sub(litintfloat, r"\1.0", file)
     file = regex.sub(litfloat, r"\1", file)
+    if danger_make_returns_sysexit:
+        nullreturn = regex.compile(r"(?m)^([ \t]*)return[ \t]*$")
+        file = regex.sub(nullreturn, r'\1__import__("sys").exit(0)', file)
 
     return file
 
@@ -217,16 +220,17 @@ if __name__ == "__main__":
     DECOMPILED_PATH = Path(__file__).parent / "Assembly-CSharp"
     ALL_MODULES = cache_output(load_modules, DECOMPILED_PATH)
     MODULE_INDEX = cache_output(load_module_index, ALL_MODULES)
-    genterr_entry = EntryPoint("WorldGeneration", "GenerateOres")
+    FUNCTION = "GenerateOres"
+    # FUNCTION = "WorldGenerateTerrain"
+    genterr_entry = EntryPoint("WorldGeneration", FUNCTION)
     genterr_entry_line = genterr_entry.resolve(MODULE_INDEX)
     genterr_function_body = get_function_body(
         genterr_entry.module, genterr_entry_line, ALL_MODULES
     )
 
     genterr_function_body = clean_up_function(genterr_function_body)
-    ir = transpile(genterr_function_body)
-    print(ir)
-    python_file = convert_function(ir)
+    ir = transpile(genterr_function_body, FUNCTION)
+    python_file = convert_function(ir, danger_make_returns_sysexit=True)
 
     output = Path().cwd() / "rawr.py"
     with open(output, "w") as w:
