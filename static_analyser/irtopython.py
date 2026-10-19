@@ -230,8 +230,9 @@ if __name__ == "__main__":
     DECOMPILED_PATH = Path(__file__).parent / "Assembly-CSharp"
     ALL_MODULES = cache_output(load_modules, DECOMPILED_PATH)
     MODULE_INDEX = cache_output(load_module_index, ALL_MODULES)
-    FUNCTION = "GenerateOres"
+    # FUNCTION = "GenerateOres"
     # FUNCTION = "WorldGenerateTerrain"
+    FUNCTION = "WorldGenerateStructures"
     genterr_entry = EntryPoint("WorldGeneration", FUNCTION)
     genterr_entry_line = genterr_entry.resolve(MODULE_INDEX)
     genterr_function_body = get_function_body(
@@ -242,7 +243,7 @@ if __name__ == "__main__":
     ir = transpile(genterr_function_body, FUNCTION)
     python_file = convert_function(ir, danger_make_returns_sysexit=True)
 
-    output = Path().cwd() / "rawr.py"
+    output = Path().cwd() / "temp_genstruct.py"
     with open(output, "w") as w:
         print(python_file, file=w)
     # print(black.format_file_in_place(output, fast=False, mode=black.FileMode()))
