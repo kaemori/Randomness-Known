@@ -40,10 +40,10 @@ def split_top_level_args(s: str) -> list[str]:
             in_str = True
             buf.append(ch)
             continue
-        if ch in "([<":
+        if ch in "([{":
             depth += 1
             buf.append(ch)
-        elif ch in ")]>":
+        elif ch in ")]}":
             depth -= 1
             buf.append(ch)
         elif ch == "," and depth == 0:

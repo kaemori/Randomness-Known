@@ -1,3 +1,5 @@
+# cuz regex wasnt good enough...
+
 _BREAK_CHARS = set(",;")
 _OPEN = {"(": ")", "[": "]", "{": "}"}
 _CLOSE = {v: k for (k, v) in _OPEN.items()}
@@ -6,6 +8,7 @@ _CLOSE = {v: k for (k, v) in _OPEN.items()}
 def _fix_ternary_once(code):
     depth_stack = []
     last_break = {0: 0}
+    break_is_open = {0: False}
     in_str = None
     i = 0
     n = len(code)
@@ -27,6 +30,7 @@ def _fix_ternary_once(code):
         if ch in _OPEN:
             depth_stack.append(ch)
             last_break[depth + 1] = i + 1
+            break_is_open[depth + 1] = True
             i += 1
             continue
         if ch in _CLOSE:
@@ -36,6 +40,7 @@ def _fix_ternary_once(code):
             continue
         if ch in _BREAK_CHARS:
             last_break[depth] = i + 1
+            break_is_open[depth] = False
             i += 1
             continue
         if ch == "?" and code[i : i + 2] not in ("?.", "??"):
@@ -83,6 +88,7 @@ def _fix_ternary_once(code):
             k = colon_pos + 1
             k_in_str = None
             k_depth = 0
+            stopped_at_close = False
             while k < n:
                 ck = code[k]
                 if k_in_str:
@@ -101,6 +107,7 @@ def _fix_ternary_once(code):
                     k_depth += 1
                 elif ck in _CLOSE:
                     if k_depth == 0:
+                        stopped_at_close = True
                         break
                     k_depth -= 1
                 elif k_depth == 0 and ck in _BREAK_CHARS:
@@ -115,7 +122,11 @@ def _fix_ternary_once(code):
                 continue
             then = _resolve_all(then)
             els = _resolve_all(els)
-            replacement = f"({then} if {cond} else {els})"
+            already_wrapped = break_is_open.get(depth, False) and stopped_at_close
+            if already_wrapped:
+                replacement = f"{then} if {cond} else {els}"
+            else:
+                replacement = f"({then} if {cond} else {els})"
             return code[:cond_start] + replacement + code[else_end:]
         i += 1
     return code
@@ -130,19 +141,26 @@ def _resolve_all(code):
     return code
 
 
+def fix_ternary(s, n=10):
+    for _ in range(n):
+        new = _fix_ternary_once(s)
+        if new == s:
+            break
+        s = new
+    return s
+
+
 if __name__ == "__main__":
+
     tests = [
         "        vector2Int += (a ? b : 0, a ? b : 0)",
         "x = a ? b : c;",
         "a ? b : c ? d : e",
         "foo(a ? b : c, d)",
         'name = cond ? "yes, really" : "no"',
+        "        this.worldBlocks[j, num18] = ((noise2 > num19 && dirtPerlinNoise.GetNoise((float)j, (float)num18) < -0.4f) ? ((noise2 < num19 + 0.1f) ? 12 : 13) : 0);",
     ]
     for t in tests:
-        s = t
-        for _ in range(5):
-            new_s = _fix_ternary_once(s)
-            if new_s == s:
-                break
-            s = new_s
-        print(repr(t), "->", repr(s))
+        print(repr(t))
+        print(" ->", repr(fix_ternary(t)))
+        print()

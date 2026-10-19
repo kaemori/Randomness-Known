@@ -4,6 +4,13 @@ import math
 
 
 class Vector2:
+    zero = None
+    one = None
+    up = None
+    down = None
+    left = None
+    right = None
+
     def __init__(self, x: int, y: int):
         self.x, self.y = x, y
 
@@ -55,6 +62,18 @@ class Vector2:
 
     def copy(self):
         return Vector2(self.x, self.y)
+
+    @staticmethod
+    def Distance(first, second):
+        return (first - second).magnitude()
+
+
+Vector2.zero = Vector2(0, 0)
+Vector2.one = Vector2(1, 1)
+Vector2.up = Vector2(0, 1)
+Vector2.down = Vector2(0, -1)
+Vector2.left = Vector2(-1, 0)
+Vector2.right = Vector2(1, 0)
 
 
 class Rot:

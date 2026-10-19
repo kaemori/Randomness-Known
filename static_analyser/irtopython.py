@@ -2,7 +2,7 @@ import regex
 
 from cparser.ir_nodes import *
 from cparser.transpiler import KNOWN_TYPES
-from tools.collect_ternery import _fix_ternary_once
+from tools.collect_ternery import fix_ternary
 
 INDENT = "    "
 
@@ -10,6 +10,15 @@ INDENT = "    "
 def expr_to_str(node):
     if node is None:
         return "None"
+    if isinstance(node, Vector2Node):
+        constructor = "Vector2"
+        if node.kind == "Vector2Int":
+            return (
+                f"{constructor}(int({expr_to_str(node.x)}), int({expr_to_str(node.y)}))"
+            )
+        return f"{constructor}({expr_to_str(node.x)}, {expr_to_str(node.y)})"
+    if isinstance(node, Vector3Node):
+        return f"Vector3({expr_to_str(node.x)}, {expr_to_str(node.y)}, {expr_to_str(node.z)})"
     raw = getattr(node, "raw", None)
     if raw is not None:
         return raw
@@ -171,7 +180,7 @@ def convert_forloop(forloop, lines, indent):
 
 def convert_function(func, danger_make_returns_sysexit=False):
     lines = []
-    emit(lines, 0, "for_fixer = lambda x: math.ceil(x) if isinstance(x, float) else x")
+    # emit(lines, 0, "for_fixer = lambda x: math.ceil(x) if isinstance(x, float) else x")
     convert_block(func.body, lines, 0)
 
     litintfloat = regex.compile(r"\b((?<!\.)\d+(?!\.))f\b")
@@ -184,15 +193,16 @@ def convert_function(func, danger_make_returns_sysexit=False):
         file = file.replace(f"({type})", "")
     file = file.replace("&&", "and")
     file = file.replace("||", "or")
-    file = file.replace("new Vector2Int", "")
+    file = file.replace("default(Vector2)", "Vector2(0, 0)")
+    file = file.replace("default(Vector3)", "Vector3(0, 0, 0)")
+    file = file.replace("Vector2Int.", "Vector2.")
     file = file.replace("null", "None")
     file = file.replace("int.MaxValue", "0x7FFFFFFF")
     file = file.replace(".GetNoise", ".get_noise")
     file = regex.sub(litintsuffix, r"\1", file)
     file = regex.sub(litintfloat, r"\1.0", file)
     file = regex.sub(litfloat, r"\1", file)
-    for _ in range(5):
-        file = _fix_ternary_once(file)
+    file = fix_ternary(file)
     file = regex.sub(litintfloat, r"\1.0", file)
     file = regex.sub(litfloat, r"\1", file)
     if danger_make_returns_sysexit:
