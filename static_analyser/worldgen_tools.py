@@ -55,11 +55,23 @@ def get_blockinfo(all_modules, module_index):
 
 def copy_icon_images_to_hardcoded_path(block_info):
     block_name = block_info.values()
+    exceptions = {
+        "lightrock": "rock",
+        "scrappile": "scrap",
+        "trashpile": "trash",
+        "concretetile": "concrete",
+        "steeltile": "steelplate",
+    }
+    exceptions = {value: key for key, value in exceptions.items()}
     HARDCODED_PATH.mkdir(parents=True, exist_ok=True)
     hardcoded = {"gravel.png", "infinirock.png"}
     for image_path in ICON_PATH.glob("*.png"):
-        if image_path.stem in block_name and image_path.name not in hardcoded:
-            shutil.copy2(image_path, HARDCODED_PATH / image_path.name)
+        stem = exceptions.get(image_path.stem, image_path.stem)
+        if stem in block_name and image_path.name not in hardcoded:
+            shutil.copy2(
+                image_path,
+                HARDCODED_PATH / (stem + image_path.suffix),
+            )
 
 
 def get_id_color_mapping(block_info):
@@ -74,17 +86,9 @@ def get_id_color_mapping(block_info):
             return avg_color
 
     id_color_mapping = {"air": (20, 20, 35)}
-    exceptions = {
-        "lightrock": "rock",
-        "scrappile": "scrap",
-        "trashpile": "trash",
-        "concretetile": "concrete",
-        "steeltile": "steelplate",
-    }
     for block_id, block_name in block_info.items():
         if block_name in id_color_mapping:
             continue
-        block_name = exceptions.get(block_name, block_name)
         try:
             id_color_mapping[block_id] = _avg_color(
                 HARDCODED_PATH / f"{block_name}.png"
@@ -96,8 +100,8 @@ def get_id_color_mapping(block_info):
     return id_color_mapping
 
 
-blocks = get_blockinfo(ALL_MODULES, MODULE_INDEX)
-copy_icon_images_to_hardcoded_path(blocks)
+# blocks = get_blockinfo(ALL_MODULES, MODULE_INDEX)
+# copy_icon_images_to_hardcoded_path(blocks)
 
 
 def _normalize_addone(func):

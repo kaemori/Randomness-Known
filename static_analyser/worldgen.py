@@ -89,7 +89,7 @@ def gen_terrain(genterr_fn, gensettings: GenerationSettings):
     import matplotlib.colors as mcolors
     import numpy as np
 
-    id_color_mapping = get_id_color_mapping()
+    id_color_mapping = get_id_color_mapping(BLOCKINFO)
 
     h, w = gensettings.worldBlocks.T.shape
     img = np.zeros((h, w, 3), dtype=np.uint8)
