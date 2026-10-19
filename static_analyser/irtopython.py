@@ -38,24 +38,42 @@ def _filter_expr_stmt(lines, indent, node):
 
 def _noise_setting(lines, indent, node):
     arg = expr_to_str(node.args[0])
-    match node.method:
-        case "SetNoiseType":
-            emit(
-                lines,
-                indent,
-                f"{node.noise_var}.noise_type = {arg.replace("FastNoiseLite.NoiseType", "NoiseType.NoiseType_")}",
-            )
-        case "SetFrequency":
-            emit(lines, indent, f"{node.noise_var}.frequency = {arg}")
-        case "SetAmplitude":
-            emit(lines, indent, f"{node.noise_var}.amplitude = {arg}")
-        case "SetLacunarity":
-            emit(lines, indent, f"{node.noise_var}.lacunarity = {arg}")
-        case "SetPersistence":
-            emit(lines, indent, f"{node.noise_var}.persistence = {arg}")
 
-        case _:
-            emit(lines, indent, f"# {node.noise_var}.{node.method}({arg})")
+    ENUM_PREFIXES = {
+        "FastNoiseLite.NoiseType.": "NoiseType.NoiseType_",
+        "FastNoiseLite.FractalType.": "FractalType.FractalType_",
+        "FastNoiseLite.CellularDistanceFunction.": "CellularDistanceFunction.CellularDistanceFunction_",
+        "FastNoiseLite.CellularReturnType.": "CellularReturnType.CellularReturnType_",
+    }
+
+    def resolve_arg(a):
+        for old, new in ENUM_PREFIXES.items():
+            if a.startswith(old):
+                return a.replace(old, new)
+        return a
+
+    PROPERTY_MAP = {
+        "SetNoiseType": "noise_type",
+        "SetFractalType": "fractal_type",
+        "SetFrequency": "frequency",
+        "SetFractalOctaves": "fractal_octaves",
+        "SetFractalLacunarity": "fractal_lacunarity",
+        "SetCellularDistanceFunction": "cellular_distance_function",
+        "SetCellularReturnType": "cellular_return_type",
+        "SetCellularJitter": "cellular_jitter",
+        "SetFractalGain": "fractal_gain",
+        "SetFractalWeightedStrength": "fractal_weighted_strength",
+    }
+
+    if prop := PROPERTY_MAP.get(node.method):
+        reso = resolve_arg(arg)
+        needs_brackets = "?" in reso and ":" in reso
+        if needs_brackets:
+            emit(lines, indent, f"{node.noise_var}.{prop} = ({reso})")
+        else:
+            emit(lines, indent, f"{node.noise_var}.{prop} = {reso}")
+    else:
+        emit(lines, indent, f"# {node.noise_var}.{node.method}({arg})")
 
 
 def convert_stmt(node, lines, indent):
@@ -73,7 +91,7 @@ def convert_stmt(node, lines, indent):
             x = expr_to_str(node.x)
             y = expr_to_str(node.y)
             v = expr_to_str(node.value)
-            emit(lines, indent, f"world_blocks[{x}, {y}] = {v}")
+            emit(lines, indent, f"worldBlocks[{x}, {y}] = {v}")
 
         case IfChain():
             convert_ifchain(node, lines, indent)
@@ -83,10 +101,10 @@ def convert_stmt(node, lines, indent):
 
         case YieldReturn():
             if node.value is not None:
-                emit(lines, indent, f"yield {expr_to_str(node.value)}")
+                emit(lines, indent, f"{expr_to_str(node.value)}  # was yield statement")
 
         case YieldBreak():
-            emit(lines, indent, "return")
+            emit(lines, indent, "# yield break")
 
         case NoiseConstruct():
             emit(
@@ -142,24 +160,25 @@ def convert_ifchain(ifchain, lines, indent):
 
 def convert_forloop(forloop, lines, indent):
     loopvar, limit = forloop.condition.raw.split(" < ")
-    emit(lines, indent, f"for {loopvar} in range({limit}):")
+    emit(
+        lines,
+        indent,
+        f"for {loopvar} in range(for_fixer({limit})):",
+    )
+    #
     convert_block(forloop.body, lines, indent + 1)
 
 
 def convert_function(func):
     lines = []
-    # prefix = "async def" if func.is_coroutine else "def"
-    prefix = "def"
-    emit(
-        lines, 0, "from pyfastnoiselite.pyfastnoiselite import FastNoiseLite, NoiseType"
-    )
-    emit(lines, 0, f"{prefix} {func.name}(self):")
-    convert_block(func.body, lines, 1)
+    emit(lines, 0, "for_fixer = lambda x: math.ceil(x) if isinstance(x, float) else x")
+    convert_block(func.body, lines, 0)
 
     trinary = regex.compile(
         r"(?P<ternary>\((?P<cond>(?:[^()?:]|(?P>paren))*+)\s*\?\s*(?P<then>(?:[^()?:]|(?P>paren))*+)\s*:\s*(?P<else>(?:[^()?:]|(?P>paren))*+)\))(?(DEFINE)(?P<paren>\((?:(?P>ternary)|[^()]|(?P>paren))*+\)))"
     )
-    litfloat = regex.compile(r"([-0-9.]+)f")
+    litintfloat = regex.compile(r"\b((?<!\.)\d+(?!\.))f\b")
+    litfloat = regex.compile(r"(-?[0-9]+(?:\.[0-9]+)?)f")
 
     file = "\n".join(lines)
 
@@ -169,8 +188,12 @@ def convert_function(func):
     file = file.replace("||", "or")
     file = file.replace("new Vector2Int", "")
     file = file.replace("null", "None")
+    file = file.replace("int.MaxValue", "0x7FFFFFFF")
+    file = regex.sub(litintfloat, r"\1.0", file)
+    file = regex.sub(litfloat, r"\1", file)
     for _ in range(3):
         file = regex.sub(trinary, r"(\g<then>if \g<cond>else \g<else>)", file)
+    file = regex.sub(litintfloat, r"\1.0", file)
     file = regex.sub(litfloat, r"\1", file)
 
     return file
@@ -194,7 +217,7 @@ if __name__ == "__main__":
     DECOMPILED_PATH = Path(__file__).parent / "Assembly-CSharp"
     ALL_MODULES = cache_output(load_modules, DECOMPILED_PATH)
     MODULE_INDEX = cache_output(load_module_index, ALL_MODULES)
-    genterr_entry = EntryPoint("WorldGeneration", "WorldGenerateTerrain")
+    genterr_entry = EntryPoint("WorldGeneration", "GenerateOres")
     genterr_entry_line = genterr_entry.resolve(MODULE_INDEX)
     genterr_function_body = get_function_body(
         genterr_entry.module, genterr_entry_line, ALL_MODULES
@@ -206,6 +229,5 @@ if __name__ == "__main__":
 
     output = Path().cwd() / "rawr.py"
     with open(output, "w") as w:
-        start = "this = FastNoiseLite = Random = Object = Resources = Quaternion = None\nworld_blocks = []\n\n"
-        print(start + python_file, file=w)
+        print(python_file, file=w)
     print(black.format_file_in_place(output, fast=False, mode=black.FileMode()))

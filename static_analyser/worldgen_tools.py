@@ -9,11 +9,54 @@ from helpers.function_getter import (
     load_modules,
     load_module_index,
 )
+from tools.index_cache import cache_output
 from cparser.transpiler import transpile
 
 DECOMPILED_PATH = Path(__file__).parent / "Assembly-CSharp"
-ALL_MODULES = load_modules(DECOMPILED_PATH)
-MODULE_INDEX = load_module_index(ALL_MODULES)
+ALL_MODULES = cache_output(load_modules, DECOMPILED_PATH)
+MODULE_INDEX = cache_output(load_module_index, ALL_MODULES)
+
+# holy shit device name leak??
+ICON_PATH = Path("/home/fern/casualties_unknown_assets/Assets/Texture2D")
+HARDCODED_PATH = Path(
+    "/home/fern/Stuff/Code/python_code/randomness_known/static_analyser/tools/hardcodedimages"
+)
+
+
+def get_id_color_mapping():
+    from PIL import Image
+
+    blocks = get_blockinfo(ALL_MODULES, MODULE_INDEX)
+
+    def _avg_color(image_path):
+        with Image.open(image_path) as img:
+            img = img.convert("RGB")
+            pixels = list(img.get_flattened_data())
+            num_pixels = len(pixels)
+            avg_color = tuple(sum(channel) // num_pixels for channel in zip(*pixels))
+            return avg_color
+
+    id_color_mapping = {"air": (20, 20, 35)}
+    hardcoded = ("gravel", "infinirock")
+    exceptions = {
+        "lightrock": "rock",
+        "scrappile": "scrap",
+        "trashpile": "trash",
+        "concretetile": "concrete",
+        "steeltile": "steelplate",
+    }
+    for block_id, block_name in blocks.items():
+        if block_name in id_color_mapping:
+            continue
+        path = HARDCODED_PATH if block_name in hardcoded else ICON_PATH
+        block_name = exceptions.get(block_name, block_name)
+        try:
+            id_color_mapping[block_id] = _avg_color(path / f"{block_name}.png")
+        except Exception as e:
+            print(f"failed to get {block_name}")
+            raise e
+
+    return id_color_mapping
 
 
 # grab block ref

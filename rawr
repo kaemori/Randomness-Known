@@ -1,0 +1,243 @@
+for_fixer = lambda x: math.ceil(x) if isinstance(x, float) else x
+tileCounter = 0
+if biomeDepth <= 1:
+    caveNoise = FastNoiseLite(seed=Random.Range(0, 0x7FFFFFFF))
+    caveNoise.noise_type = NoiseType.NoiseType_Cellular
+    caveNoise.frequency = 0.06
+    caveNoise.fractal_octaves = 3
+    caveNoise.fractal_type = FractalType.FractalType_FBm
+    caveNoise.fractal_lacunarity = 1.5
+    dirtPerlinNoise = FastNoiseLite(seed=Random.Range(0, 0x7FFFFFFF))
+    dirtPerlinNoise.noise_type = NoiseType.NoiseType_Perlin
+    dirtPerlinNoise.fractal_type = FractalType.FractalType_FBm
+    dirtPerlinNoise.fractal_octaves = 7
+    dirtPerlinNoise.frequency = 0.035
+    frequencyMap = FastNoiseLite(seed=Random.Range(0, 0x7FFFFFFF))
+    frequencyMap.noise_type = NoiseType.NoiseType_Perlin
+    frequencyMap.frequency = 0.00037
+    biomeMap = FastNoiseLite(seed=Random.Range(0, 0x7FFFFFFF))
+    biomeMap.noise_type = NoiseType.NoiseType_Cellular
+    biomeMap.frequency = 0.04
+    biomeMap.cellular_distance_function = CellularDistanceFunction.CellularDistanceFunction_EuclideanSq
+    biomeMap.cellular_return_type = CellularReturnType.CellularReturnType_Distance
+    biomeMap.cellular_jitter = 1.0
+    biomeMap.fractal_type = FractalType.FractalType_Ridged
+    biomeMap.fractal_lacunarity = 1.5
+    for i in range(for_fixer(width)):
+        for num3 in range(for_fixer(height)):
+            caveNoise.frequency = 0.06 + frequencyMap.get_noise(i, num3) * 0.01
+            worldBlocks[i, num3] = (1 if (caveNoise.get_noise(i, num3) > -0.715) else 0)
+            noise = dirtPerlinNoise.get_noise(i, num3)
+            if worldBlocks[i, num3] > 0 and noise < -0.1:
+                worldBlocks[i, num3] = (16 if (noise < -0.33) else 2)
+            if worldBlocks[i, num3] > 0 and Random.Range(0.0, 1.0) > 0.99:
+                worldBlocks[i, num3] = Random.Range(1, 5)
+            if biomeMap.get_noise(i, num3) > 0.1:
+                worldBlocks[i, num3] = Random.Range(3, 5)
+            if worldBlocks[i, num3] > 0 and biomeMap.get_noise(i, num3) < -0.8:
+                worldBlocks[i, num3] = 15
+            if biomeDepth == 1 and num3 < height * 0.5:
+                num4 = num3 / height * 2.0
+                if Random.Range(0.0, 1.0) > num4 and worldBlocks[i, num3] == 2:
+                    worldBlocks[i, num3] = 12
+                if num3 < height * 0.33 and Random.Range(0.0, 1.0) > num4 * 3.0 and worldBlocks[i, num3] == 1:
+                    worldBlocks[i, num3] = 13
+        num2 = tileCounter
+        tileCounter = num2 + 1
+        if tileCounter > 100:
+            tileCounter = 0
+    GenerateOres()
+    num5 = chunkWidth * chunkHeight * Random.Range(0.35, 0.5)
+    if biomeDepth > 0:
+        num5 = chunkWidth * chunkHeight * Random.Range(0.35, 0.5)
+        for num6 in range(for_fixer(num5)):
+            vector2Int = (Random.Range(0, width), Random.Range(0, height))
+            num7 = Random.Range(6, 64)
+            for k in range(for_fixer(num7)):
+                for l in range(for_fixer(3)):
+                    if (vector2Int[0] + k) < (width) and (vector2Int[1] + l) < (height):
+                        worldBlocks[k + vector2Int[0], l + vector2Int[1]] = 5
+        num5 = chunkWidth * chunkHeight * Random.Range(0.35, 0.5)
+        for num8 in range(for_fixer(num5)):
+            vector2Int2 = (Random.Range(0, width), Random.Range(0, height))
+            num9 = Random.Range(6, 60)
+            for m in range(for_fixer(num9)):
+                for n in range(for_fixer(3)):
+                    if (vector2Int2[0] + n) < (width) and (vector2Int2[1] + m) < (height):
+                        worldBlocks[n + vector2Int2[0], m + vector2Int2[1]] = 5
+    else:
+        num5 = chunkWidth * chunkHeight * Random.Range(0.35, 0.4)
+        for num10 in range(for_fixer(num5)):
+            vector2Int3 = (Random.Range(0, width), Random.Range(0, height))
+            num11 = Random.Range(6, 48)
+            for num12 in range(for_fixer(num11)):
+                for num13 in range(for_fixer(2)):
+                    if (vector2Int3[0] + num12) < (width) and (vector2Int3[1] + num13) < (height):
+                        worldBlocks[num12 + vector2Int3[0], num13 + vector2Int3[1]] = 11
+        num5 = chunkWidth * chunkHeight * Random.Range(0.35, 0.4)
+        for num14 in range(for_fixer(num5)):
+            vector2Int4 = (Random.Range(0, width), Random.Range(0, height))
+            num15 = Random.Range(6, 48)
+            for num16 in range(for_fixer(num15)):
+                for num17 in range(for_fixer(2)):
+                    if (vector2Int4[0] + num17) < (width) and (vector2Int4[1] + num16) < (height):
+                        worldBlocks[num17 + vector2Int4[0], num16 + vector2Int4[1]] = 11
+    UpdateWorld()
+    WorldGenerateStructures()  # was yield statement
+    if biomeDepth == 0:
+        PlaceLiquids(128.0, 1, 32)
+    else:
+        PlaceLiquids(10.0, 1, 400)
+        PlaceLiquids(18.0, 2, 128)
+    caveNoise = None
+    dirtPerlinNoise = None
+    frequencyMap = None
+    biomeMap = None
+elif biomeDepth == 2 or biomeDepth == 3:
+    biomeMap = FastNoiseLite(seed=Random.Range(0, 0x7FFFFFFF))
+    biomeMap.noise_type = NoiseType.NoiseType_Value
+    biomeMap.frequency = 0.086
+    biomeMap.fractal_type = FractalType.FractalType_FBm
+    biomeMap.fractal_octaves = (2 if (biomeDepth == 2) else 3)
+    biomeMap.fractal_gain = 0.49
+    biomeMap.fractal_weighted_strength = 2.34
+    # biomeMap.SetDomainWarpType(FastNoiseLite.DomainWarpType.OpenSimplex2)
+    # biomeMap.SetDomainWarpAmp(22.0)
+    frequencyMap = FastNoiseLite(seed=Random.Range(0, 0x7FFFFFFF))
+    frequencyMap.frequency = 0.006
+    dirtPerlinNoise = FastNoiseLite(seed=Random.Range(0, 0x7FFFFFFF))
+    dirtPerlinNoise.noise_type = NoiseType.NoiseType_Cellular
+    dirtPerlinNoise.frequency = 0.02
+    dirtPerlinNoise.fractal_type = FractalType.FractalType_Ridged
+    dirtPerlinNoise.fractal_gain = 0.65
+    caveNoise = FastNoiseLite(seed=Random.Range(0, 0x7FFFFFFF))
+    caveNoise.frequency = 0.005
+    caveNoise.fractal_type = FractalType.FractalType_PingPong
+    caveNoise.fractal_gain = 0.35
+    # caveNoise.SetDomainWarpType(FastNoiseLite.DomainWarpType.BasicGrid)
+    # caveNoise.SetDomainWarpAmp(40.0)
+    toxicNoise = FastNoiseLite(seed=Random.Range(0, 0x7FFFFFFF))
+    toxicNoise.frequency = 0.012
+    toxicNoise.fractal_type = FractalType.FractalType_PingPong
+    toxicNoise.fractal_gain = 0.3
+    # toxicNoise.SetDomainWarpType(FastNoiseLite.DomainWarpType.BasicGrid)
+    # toxicNoise.SetDomainWarpAmp(50.0)
+    biomeMap2 = FastNoiseLite(seed=Random.Range(0, 0x7FFFFFFF))
+    biomeMap2.noise_type = NoiseType.NoiseType_Cellular
+    biomeMap2.frequency = 0.05
+    biomeMap2.cellular_distance_function = CellularDistanceFunction.CellularDistanceFunction_EuclideanSq
+    biomeMap2.cellular_return_type = CellularReturnType.CellularReturnType_Distance
+    biomeMap2.cellular_jitter = 1.0
+    biomeMap2.fractal_type = FractalType.FractalType_Ridged
+    biomeMap2.fractal_lacunarity = 1.5
+    marbleMap = FastNoiseLite(seed=Random.Range(0, 0x7FFFFFFF))
+    marbleMap.frequency = (0.007 if (biomeDepth == 2) else 0.035)
+    marbleMap.noise_type = NoiseType.NoiseType_Perlin
+    # marbleMap.SetDomainWarpType(FastNoiseLite.DomainWarpType.OpenSimplex2)
+    # marbleMap.SetDomainWarpAmp(100.0)
+    i = 0
+    minMarble = (0.45 if (biomeDepth == 2) else 1.0)
+    for j in range(for_fixer(width)):
+        for num18 in range(for_fixer(height)):
+            noise2 = biomeMap.get_noise(j, num18)
+            num19 = frequencyMap.get_noise(j, num18) * 0.25 + 0.1
+            if marbleMap.get_noise(j, num18) <= minMarble:
+                worldBlocks[j, num18] = ((12 if (noise2 < num19 + 0.1) else 13) if (noise2 > num19 and dirtPerlinNoise.get_noise(j, num18) < -0.4) else 0)
+                if caveNoise.get_noise(j, num18) > 0.65:
+                    worldBlocks[j, num18] = 17
+                if noise2 > 0.75:
+                    worldBlocks[j, num18] = 15
+                if biomeMap2.get_noise(j, num18) > 0.1:
+                    worldBlocks[j, num18] = Random.Range(3, 5)
+                if biomeDepth == 3 and worldBlocks[j, num18] > 0 and Random.value < 0.1:
+                    worldBlocks[j, num18] = (15 + Random.Range(0, 2))
+            else:
+                i += 1
+                worldBlocks[j, num18] = ((18 if (dirtPerlinNoise.get_noise(j, num18) < -0.1) else 19) if (noise2 > num19) else 0)
+                if i > 100:
+                    i = 0
+                    Random._next()
+            if biomeDepth == 3 and toxicNoise.get_noise(j, num18) < -0.8 and Random.value > 0.5:
+                worldBlocks[j, num18] = 22
+            if biomeDepth == 3 and worldBlocks[j, num18] > 0 and Random.value > (num18 + (halfHeight)) / height:
+                worldBlocks[j, num18] = 23
+        tileCounter += 1
+        if tileCounter > 100:
+            tileCounter = 0
+    GenerateOres()
+    num5 = chunkWidth * chunkHeight * Random.Range(0.25, 0.3)
+    for num20 in range(for_fixer(num5)):
+        vector2Int5 = (Random.Range(0, width), Random.Range(0, height))
+        num21 = Random.Range(6, 48)
+        for num22 in range(for_fixer(num21)):
+            for num23 in range(for_fixer(2)):
+                if (vector2Int5[0] + num22) < (width) and (vector2Int5[1] + num23) < (height):
+                    worldBlocks[num22 + vector2Int5[0], num23 + vector2Int5[1]] = 11
+    num5 = chunkWidth * chunkHeight * Random.Range(0.24, 0.3)
+    for num24 in range(for_fixer(num5)):
+        vector2Int6 = (Random.Range(0, width), Random.Range(0, height))
+        num25 = Random.Range(6, 48)
+        for num26 in range(for_fixer(num25)):
+            for num27 in range(for_fixer(2)):
+                if (vector2Int6[0] + num27) < (width) and (vector2Int6[1] + num26) < (height):
+                    worldBlocks[num27 + vector2Int6[0], num26 + vector2Int6[1]] = 11
+    if biomeDepth == 3:
+        num5 = chunkWidth * chunkHeight * Random.Range(0.5, 0.6)
+        for num28 in range(for_fixer(num5)):
+            vector2Int7 = (Random.Range(0, width), Random.Range(0, height))
+            num29 = Random.Range(4, 16)
+            for num30 in range(for_fixer(num29)):
+                for num31 in range(for_fixer(num29)):
+                    if (vector2Int7[0] + num30) < (width) and (vector2Int7[1] + num31) < (height):
+                        worldBlocks[num30 + vector2Int7[0], num31 + vector2Int7[1]] = 20
+    UpdateWorld()
+    WorldGenerateStructures()  # was yield statement
+    PlaceLiquids(50.0, 1, 26)
+    PlaceLiquids(15.0, 3, 128)
+    biomeMap = None
+    frequencyMap = None
+    dirtPerlinNoise = None
+    caveNoise = None
+    toxicNoise = None
+    biomeMap2 = None
+    marbleMap = None
+elif biomeDepth == 4:
+    marbleMap = FastNoiseLite(seed=Random.Range(0, 0x7FFFFFFF))
+    marbleMap.noise_type = NoiseType.NoiseType_Value
+    marbleMap.fractal_type = FractalType.FractalType_Ridged
+    marbleMap.fractal_octaves = 3
+    marbleMap.fractal_lacunarity = 2.29
+    marbleMap.fractal_gain = 4.0
+    marbleMap.fractal_weighted_strength = 1.2
+    # marbleMap.SetDomainWarpType(FastNoiseLite.DomainWarpType.OpenSimplex2)
+    # marbleMap.SetDomainWarpAmp(41.0)
+    biomeMap2 = FastNoiseLite(seed=Random.Range(0, 0x7FFFFFFF))
+    biomeMap2.frequency = 0.02
+    # biomeMap2.SetDomainWarpType(FastNoiseLite.DomainWarpType.OpenSimplex2)
+    # biomeMap2.SetDomainWarpAmp(25.0)
+    for i in range(for_fixer(width)):
+        for num32 in range(for_fixer(height)):
+            marbleMap.frequency = 0.0189 - num32 / height * 0.002
+            num33 = marbleMap.get_noise(i, num32) + Random.Range(-0.1, 0.1)
+            if num33 > 0.15 and num33 < 0.25:
+                worldBlocks[i, num32] = 23
+            elif num33 >= 0.25 and num33 < 0.45:
+                worldBlocks[i, num32] = 16
+            elif num33 >= 0.45 and num33 < 0.66:
+                worldBlocks[i, num32] = 15
+            elif num33 >= 0.66:
+                worldBlocks[i, num32] = 19
+            if biomeMap2.get_noise(i, num32) < -0.735:
+                worldBlocks[i, num32] = 0
+        num2 = tileCounter
+        tileCounter = num2 + 1
+        if tileCounter > 100:
+            tileCounter = 0
+    GenerateOres()
+    UpdateWorld()
+    WorldGenerateStructures()  # was yield statement
+    PlaceLiquids(30.0, 1, 128)
+    PlaceLiquids(10.0, 2, 50)
+    marbleMap = None
+    biomeMap2 = None
+# yield break

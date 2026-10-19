@@ -11,6 +11,7 @@ MASK = 0xFFFFFFFF
 
 class UnityRandom:
     def __init__(self, s0_or_iter, s1=None, s2=None, s3=None):
+        self._count = 0
         if isinstance(s0_or_iter, Iterable):
             self.s0, self.s1, self.s2, self.s3 = s0_or_iter
         else:
@@ -28,6 +29,7 @@ class UnityRandom:
         return s1, s2, s3, t
 
     def _next(self):
+        self._count += 1
         t = self.s0
         t = (t ^ (t << 11)) & MASK
         t = (t ^ (t >> 8)) & MASK
@@ -51,14 +53,24 @@ class UnityRandom:
         t = (t ^ self.s3 ^ (self.s3 >> 19)) & MASK
         return to_f32((t & 0x7FFFFF) / 0x7FFFFF)
 
+    # def value(self):
+    #     return to_f32((self._next() & 0x7FFFFF) / 0x7FFFFF)
+
+    @property
     def value(self):
         return to_f32((self._next() & 0x7FFFFF) / 0x7FFFFF)
 
+    def Range(self, a, b):
+        if isinstance(a, float) or isinstance(b, float):
+            return self.range_float(a, b)
+        return self.range_int(a, b)
+
     def range_float(self, min_val, max_val):
-        return min_val + self.value() * (max_val - min_val)
+        return min_val + self.value * (max_val - min_val)
 
     def range_int(self, min_inclusive, max_exclusive):
         span = max_exclusive - min_inclusive
         if span == 0:
+            self.value()
             return min_inclusive
-        return min_inclusive + int(self.value() * span)
+        return min_inclusive + int(self.value * span)

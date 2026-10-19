@@ -1,10 +1,19 @@
 from pathlib import Path
+from dataclasses import dataclass
 import numpy as np
 import math
+import sys
+from pyfastnoiselite.pyfastnoiselite import (
+    FastNoiseLite,
+    NoiseType,
+    FractalType,
+    CellularDistanceFunction,
+    CellularReturnType,
+)
 
 import irtopython
 
-from worldgen_tools import clean_up_function, get_blockinfo
+from worldgen_tools import clean_up_function, get_blockinfo, get_id_color_mapping
 from cparser.transpiler import transpile
 from cparser.ir_nodes import *
 from tools.index_cache import cache_output
@@ -18,39 +27,102 @@ from helpers.function_getter import (
 )
 
 
-def gen_terrain(
-    genterr_fn,
-    world_blocks,
-    blockinfo,
-    unityrandom: UnityRandom,
-    randcalls=0,
-):
+@dataclass
+class GenerationSettings:
+    biomeDepth: int
+    width: int
+    height: int
+    chunkWidth: int
+    chunkHeight: int
+    Random: UnityRandom
+
+    def __post_init__(self):
+        self.worldBlocks = np.zeros((self.width, self.height), dtype=np.uint16)
+
+    @property
+    def to_global_dict(self):
+        return {
+            "math": math,
+            "FastNoiseLite": FastNoiseLite,
+            "NoiseType": NoiseType,
+            "FractalType": FractalType,
+            "CellularDistanceFunction": CellularDistanceFunction,
+            "CellularReturnType": CellularReturnType,
+            "biomeDepth": self.biomeDepth,
+            "width": self.width,
+            "height": self.height,
+            "halfHeight": self.height // 2,
+            "chunkWidth": self.chunkWidth,
+            "chunkHeight": self.chunkHeight,
+            "Random": self.Random,
+            "worldBlocks": self.worldBlocks,
+            "GenerateOres": lambda: print("generate ores called"),
+            "UpdateWorld": lambda: print("update world called"),
+            "WorldGenerateStructures": lambda: print("WorldGenerateStructures called"),
+            "PlaceLiquids": lambda a, b, c: print(
+                f"PlaceLiquids called w/ {a}, {b}, {c}"
+            ),
+        }
+
+
+def gen_terrain(genterr_fn, gensettings: GenerationSettings):
     genterr_fn = clean_up_function(genterr_fn)
     ir = transpile(genterr_fn)
-    python = irtopython.convert_function(ir).replace("this.", "this_")
+    python = (
+        irtopython.convert_function(ir)
+        .replace("this.", "")
+        .replace(
+            'Object.Instantiate(Resources.Load("Special/marbleBackground"), BlockToWorldPos((j, num18)), Quaternion.Euler(0.0, 0.0, Random.value * 360.0))',
+            "Random._next()",
+        )
+        .replace(".GetNoise", ".get_noise")
+        .replace(".x", "[0]")
+        .replace(".y", "[1]")
+        .replace(".x", "[0]")
+        .replace(".y", "[1]")
+    )
     with open("rawr", "w") as f:
         print(python, file=f)
+    exec(python, gensettings.to_global_dict)
+
+    import matplotlib.pyplot as plt
+    import matplotlib.colors as mcolors
+    import numpy as np
+
+    id_color_mapping = get_id_color_mapping()
+
+    h, w = gensettings.worldBlocks.T.shape
+    img = np.zeros((h, w, 3), dtype=np.uint8)
+    for block_id, color in id_color_mapping.items():
+        mask = gensettings.worldBlocks.T == block_id
+        img[mask] = color
+
+    plt.figure(figsize=(16, 16))
+    plt.imshow(img, origin="upper", interpolation="nearest")
+    plt.show()
 
 
 def generate_world(main_function, genterr_fn, blockinfo, unityrandom: UnityRandom):
-    chunk_size = 64
-    chunk_width = 16
-    chunk_height = 16
-
-    width = height = chunk_width * chunk_size  #  1024
-    half_width = half_height = width // 2  # 512
-    half_chunk_size = chunk_size // 2  # 32
-
+    gensettings = GenerationSettings(
+        biomeDepth=5 - 1,
+        width=1024,
+        height=1024,
+        chunkWidth=16,
+        chunkHeight=16,
+        Random=unityrandom,
+    )
     random_calls = 0
-    world_blocks = np.zeros((width, height), dtype=np.uint16)
 
     for line in main_function:
         match line.strip():
             case "yield return this.WorldCreateBackground();":
-                random_calls += math.floor(chunk_width * chunk_height * 0.4) * 4
+                random_calls += (
+                    math.floor(gensettings.chunkWidth * gensettings.chunkHeight * 0.4)
+                    * 4
+                )
 
             case "yield return this.WorldGenerateTerrain();":
-                gen_terrain(genterr_fn, world_blocks, blockinfo, unityrandom)
+                gen_terrain(genterr_fn, gensettings)
 
 
 DECOMPILED_PATH = Path(__file__).parent / "Assembly-CSharp"
