@@ -1,5 +1,6 @@
 from pathlib import Path
 from dataclasses import dataclass, make_dataclass
+import shutil
 import regex as re
 
 from helpers.csharp_syntax import find_calls_in_lines, is_line_function
@@ -21,42 +22,6 @@ ICON_PATH = Path("/home/fern/casualties_unknown_assets/Assets/Texture2D")
 HARDCODED_PATH = Path(
     "/home/fern/Stuff/Code/python_code/randomness_known/static_analyser/tools/hardcodedimages"
 )
-
-
-def get_id_color_mapping():
-    from PIL import Image
-
-    blocks = get_blockinfo(ALL_MODULES, MODULE_INDEX)
-
-    def _avg_color(image_path):
-        with Image.open(image_path) as img:
-            img = img.convert("RGB")
-            pixels = list(img.get_flattened_data())
-            num_pixels = len(pixels)
-            avg_color = tuple(sum(channel) // num_pixels for channel in zip(*pixels))
-            return avg_color
-
-    id_color_mapping = {"air": (20, 20, 35)}
-    hardcoded = ("gravel", "infinirock")
-    exceptions = {
-        "lightrock": "rock",
-        "scrappile": "scrap",
-        "trashpile": "trash",
-        "concretetile": "concrete",
-        "steeltile": "steelplate",
-    }
-    for block_id, block_name in blocks.items():
-        if block_name in id_color_mapping:
-            continue
-        path = HARDCODED_PATH if block_name in hardcoded else ICON_PATH
-        block_name = exceptions.get(block_name, block_name)
-        try:
-            id_color_mapping[block_id] = _avg_color(path / f"{block_name}.png")
-        except Exception as e:
-            print(f"failed to get {block_name}")
-            raise e
-
-    return id_color_mapping
 
 
 # grab block ref
@@ -86,6 +51,53 @@ def get_blockinfo(all_modules, module_index):
 
     # {0: 'air', 1: 'lightrock', 2: 'gravel', 3: 'scrappile', 4: 'trashpile', 5: 'concretetile', 6: 'steeltile', 7: 'glass', 8: 'rubber', 9: 'plastic', 10: 'heatresistantalloy', 11: 'wood', 12: 'sand', 13: 'sandstone', 14: 'infinirock', 15: 'clay', 16: 'soil', 17: 'granite', 18: 'marble',19: 'limestone', 20: 'bricks', 21: 'scaffolding', 22: 'toxirock', 23: 'grass', 24: 'log', 25: 'leaves', 26: 'snow', 27: 'ice', 28: 'thinice', 29: 'powdersnow', 30: 'heavyrock', 31: 'fungus', 32: 'mushroombody', 33: 'mushroomcap', 34: 'copper', 35: 'ilmenite'}
     return blocks
+
+
+def copy_icon_images_to_hardcoded_path(block_info):
+    block_name = block_info.values()
+    HARDCODED_PATH.mkdir(parents=True, exist_ok=True)
+    hardcoded = {"gravel.png", "infinirock.png"}
+    for image_path in ICON_PATH.glob("*.png"):
+        if image_path.stem in block_name and image_path.name not in hardcoded:
+            shutil.copy2(image_path, HARDCODED_PATH / image_path.name)
+
+
+def get_id_color_mapping(block_info):
+    from PIL import Image
+
+    def _avg_color(image_path):
+        with Image.open(image_path) as img:
+            img = img.convert("RGB")
+            pixels = list(img.get_flattened_data())
+            num_pixels = len(pixels)
+            avg_color = tuple(sum(channel) // num_pixels for channel in zip(*pixels))
+            return avg_color
+
+    id_color_mapping = {"air": (20, 20, 35)}
+    exceptions = {
+        "lightrock": "rock",
+        "scrappile": "scrap",
+        "trashpile": "trash",
+        "concretetile": "concrete",
+        "steeltile": "steelplate",
+    }
+    for block_id, block_name in block_info.items():
+        if block_name in id_color_mapping:
+            continue
+        block_name = exceptions.get(block_name, block_name)
+        try:
+            id_color_mapping[block_id] = _avg_color(
+                HARDCODED_PATH / f"{block_name}.png"
+            )
+        except Exception as e:
+            print(f"failed to get {block_name}")
+            raise e
+
+    return id_color_mapping
+
+
+blocks = get_blockinfo(ALL_MODULES, MODULE_INDEX)
+copy_icon_images_to_hardcoded_path(blocks)
 
 
 def _normalize_addone(func):
