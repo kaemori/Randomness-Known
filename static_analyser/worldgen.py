@@ -155,8 +155,6 @@ def gen_liquid(gensettings: GenerationSettings, per_chunk, liquid_type, max_fill
 
 
 def render_liquid_overlay(img, fluid, tile_size):
-    """Composite the fluid grid as a translucent overlay on top of the
-    already-rendered terrain image. Returns the (possibly unmodified) img."""
     fluid_ids = np.flipud(fluid.T)
     fluid_mask = fluid_ids != 0
     if not fluid_mask.any():
@@ -196,7 +194,7 @@ def gen_ores(genore_fn, gensettings: GenerationSettings):
     python = irtopython.convert_function(ir, danger_make_returns_sysexit=True).replace(
         "this.", ""
     )
-    with open("ores", "w") as f:
+    with open("ores.tmp", "w") as f:
         print(python, file=f)
 
     try:
@@ -216,7 +214,7 @@ def gen_terrain(genterr_fn, genore_fn, gensettings: GenerationSettings):
             "Random._next()",
         )
     )
-    with open("rawr", "w") as f:
+    with open("rawr.tmp", "w") as f:
         print(python, file=f)
     exec(python, gensettings.to_global_dict)
 
@@ -260,6 +258,7 @@ def generate_world(
     # import matplotlib.colors as mcolors
     import numpy as np
 
+    plt.style.use("fast")
     id_image_mapping = get_id_image_mapping(blockinfo)
 
     h, w = gensettings.worldBlocks.T.shape
