@@ -59,10 +59,11 @@ def copy_icon_images_to_hardcoded_path(block_info):
         "trashpile": "trash",
         "concretetile": "concrete",
         "steeltile": "steelplate",
+        "infinirock": "indestructirock",
     }
     exceptions = {value: key for key, value in exceptions.items()}
     HARDCODED_PATH.mkdir(parents=True, exist_ok=True)
-    hardcoded = {"gravel.png", "infinirock.png"}
+    hardcoded = {"gravel.png"}
     for image_path in ICON_PATH.glob("*.png"):
         stem = exceptions.get(image_path.stem, image_path.stem)
         if stem in block_name and image_path.name not in hardcoded:

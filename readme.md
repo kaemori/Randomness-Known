@@ -5,3 +5,5 @@ The universe's future is in your paws // Lets choose the right path.
 pyfastnoiselite installed using `pip install git+https://github.com/shauneccles/PyFastNoiseLite.git@abi3-wheels`
 
 thank you, pr hell.
+
+special thanks to jimmyking for entertaining my stupid questions

@@ -493,7 +493,8 @@ $RECYCLE.BIN/
 !**/Assembly-CSharp/**/*.md
 *.ircs
 *.venv
-
+*.tmp
+*temp_*
 .vscode
 
 # no .cs files except for those in unity_hook
