@@ -4,22 +4,14 @@ import shutil
 import regex as re
 
 from helpers.csharp_syntax import find_calls_in_lines, is_line_function
-from helpers.function_getter import (
-    EntryPoint,
-    get_function_body,
-    load_modules,
-    load_module_index,
-)
-from tools.index_cache import cache_output
-from cparser.transpiler import transpile
-
-DECOMPILED_PATH = Path(__file__).parent / "Assembly-CSharp"
-ALL_MODULES = cache_output(load_modules, DECOMPILED_PATH)
-MODULE_INDEX = cache_output(load_module_index, ALL_MODULES)
+from helpers.function_getter import EntryPoint, get_function_body
 
 # holy shit device name leak??
-ICON_PATH = Path().cwd() / "tools" / "hardcodedimages" / "Assets" / "Texture2D"
+ICON_PATH = (
+    Path().cwd() / "CasU-Decompiled" / "ExportedProject" / "Assets" / "Texture2D"
+)
 HARDCODED_PATH = Path().cwd() / "tools" / "hardcodedimages"
+HARDCODED_ENTITY_PATH = Path().cwd() / "tools" / "hardcodedimages" / "entities"
 
 
 # grab block ref
@@ -88,6 +80,7 @@ def get_guid_to_blockid(resources_path, block_info):
 def copy_icon_images_to_hardcoded_path(block_info):
     block_name = block_info.values()
     exceptions = {
+        "gravel": "dirt",
         "lightrock": "rock",
         "scrappile": "scrap",
         "trashpile": "trash",
@@ -97,14 +90,59 @@ def copy_icon_images_to_hardcoded_path(block_info):
     }
     exceptions = {value: key for key, value in exceptions.items()}
     HARDCODED_PATH.mkdir(parents=True, exist_ok=True)
-    hardcoded = {"gravel.png"}
     for image_path in ICON_PATH.glob("*.png"):
         stem = exceptions.get(image_path.stem, image_path.stem)
-        if stem in block_name and image_path.name not in hardcoded:
+        if stem in block_name:
             shutil.copy2(
                 image_path,
                 HARDCODED_PATH / (stem + image_path.suffix),
             )
+
+
+def copy_entity_images_to_hardcoded_path():
+    items = {
+        "LifePodLight",
+        "beartrap",
+        "containercrate",
+        "bioterminal",
+        "dropcapsule",
+        "rechargingstation",
+        "brownshroom",
+        "foodbox",
+        "medcrate",
+        "sawblade",
+        "scrapeater",
+        "ladder",
+        "reinforceddoor",
+    } | {
+        "lifepodpump",
+        "LifePodLight",
+        "lifepodheater",
+        "lifepodbuttonshower",
+        "lifepodshower",
+        "lifepodbuttonheat",
+    }
+    exceptions = {
+        "foodbox": "foodcrate",
+        "reinforceddoor": "door",
+        "lifepodbuttonshower": "podbutton",
+        "lifepodbuttonheat": "podbutton",
+        "LifePodLight": "lightcircle",
+    }
+    HARDCODED_ENTITY_PATH.mkdir(parents=True, exist_ok=True)
+
+    for item in items:
+        file = exceptions.get(item, item)
+        try:
+            iconpath = [
+                i for i in ICON_PATH.glob(f"{file}.*") if not i.name.endswith(".meta")
+            ][0]
+            shutil.copy2(iconpath, HARDCODED_ENTITY_PATH / (item + iconpath.suffix))
+        except:
+            print(f"{item} not exist")
+
+    # for image_path in ICON_PATH.glob("*.png"):
+    #     print(exceptions.get(image_path.stem, image_path.stem))
 
 
 def get_id_color_mapping(block_info):
@@ -133,9 +171,6 @@ def get_id_color_mapping(block_info):
     return id_color_mapping
 
 
-import numpy as np
-
-
 def get_id_image_mapping(block_info, alpha_pixel_blend_to=(20, 20, 35)):
     from PIL import Image
 
@@ -153,20 +188,36 @@ def get_id_image_mapping(block_info, alpha_pixel_blend_to=(20, 20, 35)):
         best_box = (0, 0, 8, 8)
         best_transparent_count = None
 
+        # topright to bottomleft
+        perfect_boxes = []
         for top in range(h - 8 + 1):
-            for left in range(w - 8, -1, -1):  # right to left
+            for left in range(w - 8, -1, -1):
                 region = alpha.crop((left, top, left + 8, top + 8))
                 transparent_count = sum(1 for p in region.getdata() if p == 0)
+
+                if transparent_count == 0:
+                    perfect_boxes.append((left, top, left + 8, top + 8))
+
                 if (
                     best_transparent_count is None
                     or transparent_count < best_transparent_count
                 ):
                     best_transparent_count = transparent_count
                     best_box = (left, top, left + 8, top + 8)
-                    if best_transparent_count == 0:
-                        return best_box
 
-        return best_box
+        if len(perfect_boxes) == 0:
+            return best_box
+        else:
+            # give the perfect box closest to the center
+            center_pbox = [
+                (x1, y1, x2, y2)
+                for x1, y1, x2, y2 in perfect_boxes
+                if x1 == y1 and x2 == y2
+            ]
+            if len(center_pbox) != 0:
+                return center_pbox[0]
+            else:
+                perfect_boxes[0]
 
     for block_id, block_name in block_info.items():
         if block_name in id_color_mapping:
@@ -175,7 +226,7 @@ def get_id_image_mapping(block_info, alpha_pixel_blend_to=(20, 20, 35)):
             with Image.open(HARDCODED_PATH / f"{block_name}.png") as img:
                 img = img.convert("RGBA")
 
-                if img.size != (8, 8) and block_name != "gravel":
+                if img.size != (8, 8):
                     box = find_clearest_8x8(img)
                     img = img.crop(box)
 
@@ -230,17 +281,28 @@ def clean_up_function(function):
 
 
 if __name__ == "__main__":
-    # with open("terr_ir.cs", "w") as ir:
-    #     entry = EntryPoint("WorldGeneration", "WorldGenerateTerrain")
-    #     entry_line = entry.resolve(MODULE_INDEX)
+    from helpers.function_getter import load_module_index, load_modules
+    from tools.index_cache import cache_output
 
-    #     function_body = get_function_body(entry.module, entry_line, ALL_MODULES)
+    all_modules = cache_output(load_modules, Path(__file__).parent / "Assembly-CSharp")
+    module_index = cache_output(load_module_index, all_modules)
+    copy_icon_images_to_hardcoded_path(get_blockinfo(all_modules, module_index))
+    copy_entity_images_to_hardcoded_path()
+
+    # all_modules = load_modules(Path(__file__).parent / "Assembly-CSharp")
+    # module_index = load_module_index(all_modules)
+
+    # # with open("terr_ir.cs", "w") as ir:
+    # #     entry = EntryPoint("WorldGeneration", "WorldGenerateTerrain")
+    # #     entry_line = entry.resolve(MODULE_INDEX)
+
+    # #     function_body = get_function_body(entry.module, entry_line, ALL_MODULES)
+    # #     function_body = clean_up_function(function_body)
+    # #     ir.writelines(function_body)
+    # with open("gen_ores.cs", "w") as ir:
+    #     entry = EntryPoint("WorldGeneration", "GenerateOres")
+    #     entry_line = entry.resolve(module_index)
+
+    #     function_body = get_function_body(entry.module, entry_line, all_modules)
     #     function_body = clean_up_function(function_body)
     #     ir.writelines(function_body)
-    with open("gen_ores.cs", "w") as ir:
-        entry = EntryPoint("WorldGeneration", "GenerateOres")
-        entry_line = entry.resolve(MODULE_INDEX)
-
-        function_body = get_function_body(entry.module, entry_line, ALL_MODULES)
-        function_body = clean_up_function(function_body)
-        ir.writelines(function_body)

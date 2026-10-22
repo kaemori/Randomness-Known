@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Callable, Optional, Tuple
 import numpy as np
 
-from worldgen import GenerationSettings
+from tools.generation_settings import GenerationSettings
 
 Vec2 = Tuple[float, float]
 

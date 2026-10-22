@@ -33,6 +33,7 @@ class GenerationSettings:
     chunkHeight: int
     run_settings: RunSettings
     Random: UnityRandom
+    deferred_gen_block_cirle: Any
     deferred_gen_ore_fn: Any
     deferred_gen_liquid: Any
     deferred_gen_structures: Any
@@ -51,7 +52,17 @@ class GenerationSettings:
             def Clamp(a, mi, ma):
                 return max(mi, min(a, ma))
 
+            @staticmethod
+            def Lerp(a, b, t):
+                return a + (b - a) * t
+
         self.Mathf = Mathf
+
+    def WorldToBlockPos(self, pos):
+        return pos + Vector2(self.width // 2, self.height // 2)
+
+    def SetBlock(self, vector2int, block):
+        self.worldBlocks[*vector2int] = block
 
     @property
     def to_global_dict(self):
@@ -73,6 +84,8 @@ class GenerationSettings:
             "Random": self.Random,
             "Vector2": Vector2,
             "Vector3": Vector3,
+            "GenerateBlockCircle": self.deferred_gen_block_cirle,
+            "WorldToBlockPos": self.WorldToBlockPos,
             "worldBlocks": self.worldBlocks,
             "GenerateOres": self.deferred_gen_ore_fn,
             "UpdateWorld": lambda: print("update world called"),
