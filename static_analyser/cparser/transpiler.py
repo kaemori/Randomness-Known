@@ -36,6 +36,7 @@ KNOWN_TYPES = {
     "Vector2",
     "Vector3",
     "FastNoiseLite",
+    "GameObject",
 }
 TYPE_RE = (
     "(?:"

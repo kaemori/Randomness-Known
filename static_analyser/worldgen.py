@@ -14,87 +14,22 @@ from pyfastnoiselite.pyfastnoiselite import (
 )
 
 import irtopython
-
 from worldgen_tools import clean_up_function, get_blockinfo, get_id_image_mapping
+from worldviewer import show_world
 from cparser.transpiler import transpile
 from cparser.ir_nodes import *
 from tools.index_cache import cache_output
 from tools.unity_random import UnityRandom
 from tools.vectors import Vector2, Vector3
 from tools.runsettings_parser import run_setting
+from tools.generation_settings import GenerationSettings, RunSettings
+from structures import world_generate_structures
 from helpers.function_getter import (
     EntryPoint,
     load_modules,
     load_module_index,
     get_function_body,
-    find_function_lines,
 )
-
-
-@dataclass
-class RunSettings:
-    # pretty misleading name for something that just stores run settings
-    settings: dict
-
-    def GetRunSettingFloat(self, query):
-        return self.settings[query]
-
-
-@dataclass
-class GenerationSettings:
-    biomeDepth: int
-    width: int
-    height: int
-    chunkWidth: int
-    chunkHeight: int
-    run_settings: RunSettings
-    Random: UnityRandom
-    deferred_gen_ore_fn: Any
-
-    def __post_init__(self):
-        self.worldBlocks = np.zeros((self.width, self.height), dtype=np.uint16)
-        self.fluid = np.zeros((self.width, self.height), dtype=np.uint8)
-
-        class Mathf:
-            # highkey just monkeypatch it
-            @staticmethod
-            def RoundToInt(x):
-                return round(x)
-
-            @staticmethod
-            def Clamp(a, mi, ma):
-                return max(mi, min(a, ma))
-
-        self.Mathf = Mathf
-
-    @property
-    def to_global_dict(self):
-        return {
-            "math": math,
-            "Mathf": self.Mathf,
-            "FastNoiseLite": FastNoiseLite,
-            "NoiseType": NoiseType,
-            "FractalType": FractalType,
-            "CellularDistanceFunction": CellularDistanceFunction,
-            "CellularReturnType": CellularReturnType,
-            "WorldGeneration": self.run_settings,
-            "biomeDepth": self.biomeDepth,
-            "width": self.width,
-            "height": self.height,
-            "halfHeight": self.height // 2,
-            "chunkWidth": self.chunkWidth,
-            "chunkHeight": self.chunkHeight,
-            "Random": self.Random,
-            "Vector2": Vector2,
-            "Vector3": Vector3,
-            "worldBlocks": self.worldBlocks,
-            "GenerateOres": self.deferred_gen_ore_fn,
-            "UpdateWorld": lambda: print("update world called"),
-            "WorldGenerateStructures": lambda: print("WorldGenerateStructures called"),
-            "PlaceLiquids": lambda per_chunk, liquid_type, max_fill: gen_liquid(
-                self, per_chunk, liquid_type, max_fill
-            ),
-        }
 
 
 def _liquid_flood_fill(gensettings: GenerationSettings, x, y, fill, max_count):
@@ -144,7 +79,6 @@ def gen_liquid(gensettings: GenerationSettings, per_chunk, liquid_type, max_fill
                 -gensettings.height // 2, gensettings.height // 2 - 32
             )
         )
-        # print(f"liquid at {x}, {y}")
         _liquid_flood_fill(
             gensettings,
             x + gensettings.width // 2,
@@ -194,16 +128,13 @@ def gen_ores(genore_fn, gensettings: GenerationSettings):
     python = irtopython.convert_function(ir, danger_make_returns_sysexit=True).replace(
         "this.", ""
     )
-    with open("ores.tmp", "w") as f:
-        print(python, file=f)
-
     try:
         exec(python, gensettings.to_global_dict)
     except SystemExit:
         pass
 
 
-def gen_terrain(genterr_fn, genore_fn, gensettings: GenerationSettings):
+def gen_terrain(genterr_fn, gensettings: GenerationSettings):
     genterr_fn = clean_up_function(genterr_fn)
     ir = transpile(genterr_fn, "WorldGenerateTerrain")
     python = (
@@ -214,8 +145,6 @@ def gen_terrain(genterr_fn, genore_fn, gensettings: GenerationSettings):
             "Random._next()",
         )
     )
-    with open("rawr.tmp", "w") as f:
-        print(python, file=f)
     exec(python, gensettings.to_global_dict)
 
 
@@ -224,12 +153,11 @@ def generate_world(
     main_function,
     genterr_fn,
     genore_fn,
-    blockinfo,
     unityrandom: UnityRandom,
 ):
     start_time = time.time()
     gensettings = GenerationSettings(
-        biomeDepth=5 - 1,
+        biomeDepth=3 - 1,
         width=1024,
         height=1024,
         chunkWidth=16,
@@ -237,6 +165,10 @@ def generate_world(
         run_settings=run_settings,
         Random=unityrandom,
         deferred_gen_ore_fn=lambda: gen_ores(genore_fn, gensettings),
+        deferred_gen_liquid=lambda per_chunk, liquid_type, max_fill: gen_liquid(
+            gensettings, per_chunk, liquid_type, max_fill
+        ),
+        deferred_gen_structures=lambda: world_generate_structures(gensettings),
     )
     random_calls = 0
 
@@ -249,41 +181,10 @@ def generate_world(
                 )
 
             case "yield return this.WorldGenerateTerrain();":
-                gen_terrain(genterr_fn, genore_fn, gensettings)
+                gen_terrain(genterr_fn, gensettings)
 
     print(f"took {time.time()-start_time:.2f} to finish!")
-    # we done!
-    import matplotlib.pyplot as plt
-
-    # import matplotlib.colors as mcolors
-    import numpy as np
-
-    plt.style.use("fast")
-    id_image_mapping = get_id_image_mapping(blockinfo)
-
-    h, w = gensettings.worldBlocks.T.shape
-    tile_size = 8
-    block_ids = np.flipud(gensettings.worldBlocks.T)
-    tile_images = np.zeros(
-        (max(blockinfo) + 1, tile_size, tile_size, 3), dtype=np.uint8
-    )
-    for block_id, tile_image in id_image_mapping.items():
-        if isinstance(block_id, int):
-            tile_images[block_id] = np.asarray(tile_image)
-
-    img = tile_images[block_ids]
-    img = (
-        img.transpose(0, 2, 1, 3, 4)
-        .reshape(h * tile_size, w * tile_size, 3)
-        .astype(np.float32)
-    )
-
-    img = render_liquid_overlay(img, gensettings.fluid, tile_size)
-    img = img.astype(np.uint8)
-
-    plt.figure(figsize=(16, 16))
-    plt.imshow(img, origin="upper", interpolation="nearest")
-    plt.show()
+    show_world(gensettings, BLOCKINFO)
 
 
 DECOMPILED_PATH = Path(__file__).parent / "Assembly-CSharp"
@@ -309,7 +210,6 @@ run_settings = RunSettings(
 # run_settings.settings["oreamount"] = 1000.0
 # print(run_settings.settings)
 
-
 genworld_function_body = get_function_body(
     worldgen_entry.module, worldgen_entry_line, ALL_MODULES
 )
@@ -325,6 +225,5 @@ generate_world(
     genworld_function_body,
     genterr_function_body,
     genore_function_body,
-    BLOCKINFO,
     unity_random,
 )

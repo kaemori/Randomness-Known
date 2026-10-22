@@ -18,7 +18,7 @@ ALL_MODULES = cache_output(load_modules, DECOMPILED_PATH)
 MODULE_INDEX = cache_output(load_module_index, ALL_MODULES)
 
 # holy shit device name leak??
-ICON_PATH = Path("/home/fern/casualties_unknown_assets/Assets/Texture2D")
+ICON_PATH = Path().cwd() / "tools" / "hardcodedimages" / "Assets" / "Texture2D"
 HARDCODED_PATH = Path().cwd() / "tools" / "hardcodedimages"
 
 
@@ -49,6 +49,40 @@ def get_blockinfo(all_modules, module_index):
 
     # {0: 'air', 1: 'lightrock', 2: 'gravel', 3: 'scrappile', 4: 'trashpile', 5: 'concretetile', 6: 'steeltile', 7: 'glass', 8: 'rubber', 9: 'plastic', 10: 'heatresistantalloy', 11: 'wood', 12: 'sand', 13: 'sandstone', 14: 'infinirock', 15: 'clay', 16: 'soil', 17: 'granite', 18: 'marble',19: 'limestone', 20: 'bricks', 21: 'scaffolding', 22: 'toxirock', 23: 'grass', 24: 'log', 25: 'leaves', 26: 'snow', 27: 'ice', 28: 'thinice', 29: 'powdersnow', 30: 'heavyrock', 31: 'fungus', 32: 'mushroombody', 33: 'mushroomcap', 34: 'copper', 35: 'ilmenite'}
     return blocks
+
+
+ASSET_BLOCK_NAME_ALIASES = {
+    "dirt": "gravel",
+    "rock": "lightrock",
+    "scrap": "scrappile",
+    "trash": "trashpile",
+    "concrete": "concretetile",
+    "steelplate": "steeltile",
+    "infinirock": "infinirock",
+    "specialnulltile": "air",
+}
+
+
+def get_guid_to_blockid(resources_path, block_info):
+    block_ids = {name: block_id for block_id, name in block_info.items()}
+    guid_to_blockid = {"null": block_ids["gravel"], "-1": 0}
+
+    for meta_path in Path(resources_path).glob("*.asset.meta"):
+        asset_name = meta_path.name.removesuffix(".asset.meta").lower()
+        block_name = ASSET_BLOCK_NAME_ALIASES.get(asset_name, asset_name)
+        if block_name not in block_ids:
+            continue
+
+        guid = None
+        for line in meta_path.read_text(encoding="utf-8").splitlines():
+            if line.startswith("guid:"):
+                guid = line.partition(":")[2].strip()
+                break
+        if guid is None:
+            raise ValueError(f"Missing GUID in {meta_path}")
+        guid_to_blockid[guid] = block_ids[block_name]
+
+    return guid_to_blockid
 
 
 def copy_icon_images_to_hardcoded_path(block_info):
@@ -99,21 +133,56 @@ def get_id_color_mapping(block_info):
     return id_color_mapping
 
 
-def get_id_image_mapping(block_info):
-    import matplotlib.image as mpimg
+import numpy as np
+
+
+def get_id_image_mapping(block_info, alpha_pixel_blend_to=(20, 20, 35)):
     from PIL import Image
 
     air_img = Image.new("RGB", (8, 8), (20, 20, 35))
-
     id_color_mapping = {"air": air_img}
+
+    bg = Image.new("RGBA", (8, 8), alpha_pixel_blend_to + (255,))
+
+    def find_clearest_8x8(img):
+        w, h = img.size
+        if w < 8 or h < 8:
+            return (0, 0, w, h)
+
+        alpha = img.getchannel("A")
+        best_box = (0, 0, 8, 8)
+        best_transparent_count = None
+
+        for top in range(h - 8 + 1):
+            for left in range(w - 8, -1, -1):  # right to left
+                region = alpha.crop((left, top, left + 8, top + 8))
+                transparent_count = sum(1 for p in region.getdata() if p == 0)
+                if (
+                    best_transparent_count is None
+                    or transparent_count < best_transparent_count
+                ):
+                    best_transparent_count = transparent_count
+                    best_box = (left, top, left + 8, top + 8)
+                    if best_transparent_count == 0:
+                        return best_box
+
+        return best_box
+
     for block_id, block_name in block_info.items():
         if block_name in id_color_mapping:
             continue
         try:
             with Image.open(HARDCODED_PATH / f"{block_name}.png") as img:
-                img = img.convert("RGB")
+                img = img.convert("RGBA")
+
+                if img.size != (8, 8) and block_name != "gravel":
+                    box = find_clearest_8x8(img)
+                    img = img.crop(box)
+
                 img = img.resize((8, 8), Image.BILINEAR)
-                id_color_mapping[block_id] = img
+
+                composited = Image.alpha_composite(bg, img)
+                id_color_mapping[block_id] = composited.convert("RGB")
 
         except Exception as e:
             print(f"failed to get {block_name}")
