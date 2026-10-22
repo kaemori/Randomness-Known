@@ -1,4 +1,5 @@
 from __future__ import annotations
+from pathlib import Path
 import tkinter as tk
 from tkinter import ttk
 import numpy as np
@@ -9,6 +10,7 @@ to_rgb = lambda x: tuple(int(x[i : i + 2], 16) for i in (0, 2, 4))
 FLUID_COLORS = {1: to_rgb("223355"), 2: to_rgb("224400")}
 FLUID_ALPHA = 0.45
 BACKGROUND_COLOR = np.array((20, 20, 35), dtype=np.uint8)
+ENTITY_IMAGE_PATH = Path(__file__).parent / "tools" / "hardcodedimages" / "entities"
 
 
 def _build_color_lut(id_color_mapping, max_id):
@@ -37,6 +39,21 @@ def _fluid_lut(max_fluid_id):
     return lut
 
 
+def _load_entity_images(entities):
+    images = {}
+    names = {
+        name
+        for entity in entities or []
+        for name in (entity.get("id"), entity.get("name"))
+        if name
+    }
+    for name in names:
+        image_path = ENTITY_IMAGE_PATH / f"{name}.png"
+        if image_path.exists():
+            images[name] = Image.open(image_path).convert("RGBA")
+    return images
+
+
 class WorldViewer(tk.Tk):
     def __init__(
         self,
@@ -45,6 +62,7 @@ class WorldViewer(tk.Tk):
         blockinfo,
         id_image_mapping,
         id_color_mapping,
+        entities=None,
         tile_size=8,
         window_size=(1000, 800),
     ):
@@ -55,6 +73,8 @@ class WorldViewer(tk.Tk):
         self.world_blocks = world_blocks
         self.fluid = fluid
         self.blockinfo = blockinfo
+        self.entities = entities or []
+        self.entity_images = _load_entity_images(self.entities)
         self.width, self.height = world_blocks.shape
         self.tile_size = tile_size
         self.DETAIL_THRESHOLD = max(tile_size / 2, 2.0)
@@ -180,8 +200,12 @@ class WorldViewer(tk.Tk):
             rgb = self._render_detail(cw, ch)
         else:
             rgb = self._render_overview(cw, ch)
-        img = Image.fromarray(rgb, "RGB")
-        self._tkimg = ImageTk.PhotoImage(img)
+        img = Image.new("RGBA", (cw, ch), tuple(BACKGROUND_COLOR) + (255,))
+        self._draw_entities(img)
+        tile_img = Image.fromarray(rgb, "RGB").convert("RGBA")
+        tile_img.putalpha(Image.fromarray(self._render_tile_mask(cw, ch), "L"))
+        img.alpha_composite(tile_img)
+        self._tkimg = ImageTk.PhotoImage(img.convert("RGB"))
         self.canvas.delete("all")
         self.canvas.create_image(0, 0, anchor="nw", image=self._tkimg)
         self._update_status()
@@ -217,6 +241,21 @@ class WorldViewer(tk.Tk):
         out[~(valid_y[:, None] & valid_x[None, :])] = BACKGROUND_COLOR
         return out.astype(np.uint8)
 
+    def _render_tile_mask(self, cw, ch):
+        px = np.arange(cw, dtype=np.float32)
+        py = np.arange(ch, dtype=np.float32)
+        wx = np.floor(self.offset_x + px / self.zoom).astype(np.int32)
+        wy = np.floor(self.offset_y + (ch - 1 - py) / self.zoom).astype(np.int32)
+        valid_x = (wx >= 0) & (wx < self.width)
+        valid_y = (wy >= 0) & (wy < self.height)
+        wx = np.clip(wx, 0, self.width - 1)
+        wy = np.clip(wy, 0, self.height - 1)
+        occupied = (self.world_blocks[wx[None, :], wy[:, None]] != 0) | (
+            self.fluid[wx[None, :], wy[:, None]] != 0
+        )
+        occupied &= valid_y[:, None] & valid_x[None, :]
+        return np.where(occupied, 255, 0).astype(np.uint8)
+
     def _render_detail(self, cw, ch):
         bx0, by0, bw, bh = self._visible_block_range(cw, ch)
         t = self.tile_size
@@ -250,9 +289,49 @@ class WorldViewer(tk.Tk):
         out[valid] = tile_img[np.ix_(ty, tx)][valid]
         return out.astype(np.uint8)
 
+    def _draw_entities(self, image):
+        if not self.entities:
+            return
+
+        for entity in self.entities:
+            icon = self.entity_images.get(entity.get("id")) or self.entity_images.get(
+                entity.get("name")
+            )
+            position = entity.get("position", {})
+            if icon is None or "x" not in position or "y" not in position:
+                continue
+
+            scale = self.zoom / self.tile_size
+            entity_scale = entity.get("scale", {})
+            scale_x = float(entity_scale.get("x", 1.0))
+            scale_y = float(entity_scale.get("y", 1.0))
+            icon_width = max(round(icon.width * scale * abs(scale_x)), 2)
+            icon_height = max(round(icon.height * scale * abs(scale_y)), 2)
+            if entity.get("length") and entity.get("id") == "ladder":
+                icon_height = max(round(entity["length"] * self.zoom * abs(scale_y)), 2)
+            icon = icon.resize((icon_width, icon_height), Image.Resampling.NEAREST)
+            if scale_x < 0:
+                icon = icon.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+            if scale_y < 0:
+                icon = icon.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+            rotation = float(entity.get("rotation_deg", 0.0))
+            if rotation:
+                icon = icon.rotate(
+                    rotation, expand=True, resample=Image.Resampling.NEAREST
+                )
+
+            x = round((float(position["x"]) - self.offset_x) * self.zoom)
+            y = round(image.height - (float(position["y"]) - self.offset_y) * self.zoom)
+            image.alpha_composite(icon, (x - icon.width // 2, y - icon.height // 2))
+
 
 def show_world(
-    gensettings, blockinfo, id_image_mapping=None, id_color_mapping=None, tile_size=8
+    gensettings,
+    blockinfo,
+    id_image_mapping=None,
+    id_color_mapping=None,
+    entities=None,
+    tile_size=8,
 ):
     from worldgen_tools import (
         get_id_image_mapping,
@@ -269,6 +348,7 @@ def show_world(
         blockinfo,
         id_image_mapping,
         id_color_mapping,
+        entities=entities,
         tile_size=tile_size,
     )
     app.mainloop()

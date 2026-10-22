@@ -111,6 +111,7 @@ def _get_single_prefab(name):
             tilemaps_raws.append(data)
 
     tilemap = []
+    tilemap_bounds = []
     for raw in tilemaps_raws:
         try:
             raw = raw["Tilemap"]
@@ -131,14 +132,18 @@ def _get_single_prefab(name):
                 for item in lookup_guid
             ]
 
-            tiles = np.zeros((x_high - x_low + 1, y_high - y_low + 1), dtype=np.uint16)
+            tiles_arr = np.zeros(
+                (x_high - x_low + 1, y_high - y_low + 1), dtype=np.uint16
+            )
             for tile in raw["m_Tiles"]:
                 loc = tile["first"]
                 x, y = int(loc["x"]), int(loc["y"])
-                tiles[x - x_low, y - y_low] = lookup[int(tile["second"]["m_TileIndex"])]
+                tiles_arr[x - x_low, y - y_low] = lookup[
+                    int(tile["second"]["m_TileIndex"])
+                ]
 
-            tilemap.append(tiles)
-
+            tilemap.append(tiles_arr)
+            tilemap_bounds.append((x_low, y_low))
         except:
             continue
 
@@ -177,11 +182,19 @@ def _get_single_prefab(name):
         if entity_script is None or transform is None:
             continue
 
-        position = transform["m_LocalPosition"]
+        position = {k: float(v) for k, v in transform["m_LocalPosition"].items()}
+        if tilemap_bounds:
+            ref_x_low, ref_y_low = tilemap_bounds[0]
+            position["x"] -= ref_x_low
+            position["y"] -= ref_y_low
+
+        local_scale = transform.get("m_LocalScale", {"x": 1, "y": 1, "z": 1})
+
         entry = {
             "id": entity_script.get("id") or game_object.get("m_Name"),
             "name": game_object.get("m_Name"),
             "position": {key: float(position[key]) for key in ("x", "y", "z")},
+            "scale": {key: float(local_scale[key]) for key in ("x", "y", "z")},
             "rotation_deg": _quat_to_z_degrees(transform["m_LocalRotation"]),
         }
 
@@ -194,13 +207,14 @@ def _get_single_prefab(name):
     return tilemap, entities
 
 
-def _render_tilemap(tm):
+def _render_tilemap(tm, entities):
+
     to_show = tm
     viewer_data = SimpleNamespace(
         worldBlocks=to_show,
         fluid=np.zeros_like(to_show, dtype=np.uint8),
     )
-    show_world(viewer_data, BLOCKINFO)
+    show_world(viewer_data, BLOCKINFO, entities=entities)
 
 
 # a = set(
@@ -213,19 +227,15 @@ def _render_tilemap(tm):
 # for prefab in get_structure_set(genstruct_function_body):
 #     print(prefab, [entity["id"] for entity in _get_single_prefab(prefab)[1]])
 
-print(get_structure_set(genstruct_function_body))
 # tm, blockentities = _get_single_prefab("structures/MedicalBuilding")
 # tm, blockentities = _get_single_prefab("structures/SteelBridge")
-# tm, blockentities = _get_single_prefab("structures/BrickLoot")
+tm, blockentities = _get_single_prefab("structures/BrickLoot")
 # tm, blockentities = _get_single_prefab("structures/SteelThing")
 # tm, blockentities = _get_single_prefab("structures/CrystalSpawnPlatform")
-tm, blockentities = _get_single_prefab("Lifepod")
+# tm, blockentities = _get_single_prefab("Lifepod")
+# tm, blockentities = _get_single_prefab("BioContainer")
 # tm, blockentities = _get_single_prefab("Structures/LongCorridor")
-# tm = _get_single_prefab("dropcapsule")
-from pprint import pprint
 
-pprint(blockentities)
-print(set([entity["id"] for entity in blockentities]))
 
-_render_tilemap(tm[0])
+_render_tilemap(tm[0], blockentities)
 # _get_single_prefab("BioContainer")
