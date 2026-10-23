@@ -100,34 +100,45 @@ def copy_icon_images_to_hardcoded_path(block_info):
 
 
 def copy_entity_images_to_hardcoded_path():
-    items = {
-        "LifePodLight",
-        "beartrap",
-        "containercrate",
-        "bioterminal",
-        "dropcapsule",
-        "rechargingstation",
-        "brownshroom",
-        "foodbox",
-        "medcrate",
-        "sawblade",
-        "scrapeater",
-        "ladder",
-        "reinforceddoor",
-    } | {
-        "lifepodpump",
-        "LifePodLight",
-        "lifepodheater",
-        "lifepodbuttonshower",
-        "lifepodshower",
-        "lifepodbuttonheat",
-    }
+    items = (
+        {
+            "LifePodLight",
+            "beartrap",
+            "containercrate",
+            "bioterminal",
+            "dropcapsule",
+            "rechargingstation",
+            "brownshroom",
+            "foodbox",
+            "medcrate",
+            "sawblade",
+            "scrapeater",
+            "ladder",
+            "reinforceddoor",
+        }
+        | {
+            "lifepodchest",
+            "lifepodpump",
+            "LifePodLight",
+            "lifepodheater",
+            "lifepodbuttonshower",
+            "lifepodshower",
+            "lifepodbuttonheat",
+            "LoreNote",
+            "epda",
+            "manualdefibrillator",
+            "defibrack",
+            "aed",
+        }
+        | {"experimentflesh", "internalorgans"}
+    )
     exceptions = {
         "foodbox": "foodcrate",
         "reinforceddoor": "door",
         "lifepodbuttonshower": "podbutton",
         "lifepodbuttonheat": "podbutton",
         "LifePodLight": "lightcircle",
+        "LoreNote": "wallpaper",
     }
     HARDCODED_ENTITY_PATH.mkdir(parents=True, exist_ok=True)
 

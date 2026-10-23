@@ -17,11 +17,11 @@ from worldgen_tools import get_blockinfo, get_id_image_mapping
 from worldviewer import show_world
 from cparser.ir_nodes import *
 from tools.index_cache import cache_output
-from tools.unity_random import UnityRandom
+from tools.unity_random import UnityRandom, splitmix64
 from tools.vectors import Vector2, Vector3
 from tools.runsettings_parser import run_setting
 from tools.context import WorldgenContext
-from tools.generation_settings import GenerationSettings, RunSettings
+from tools.generation_settings import GenerationSettings, RunSettings, gen_block_circle
 from structures_gen import world_generate_structures
 from helpers.function_getter import load_module_index, load_modules
 from helpers.transpiler import FunctionTranspiler
@@ -127,33 +127,12 @@ def gen_ores(python, gensettings: GenerationSettings):
 def gen_terrain(python, gensettings: GenerationSettings):
     print("generating terrain")
     python = python.replace(
-        'Object.Instantiate(Resources.Load("Special/marbleBackground"), BlockToWorldPos(new Vector2Int(j, num18)), Quaternion.Euler(0.0, 0.0, Random.value * 360.0))',
-        "Random._next()",
+        'Object.Instantiate(Resources.Load("Special/marbleBackground"), BlockToWorldPos(Vector2(int(j), int(num18))), Quaternion.Euler(0.0, 0.0, Random.value * 360.0))',
+        'Random._next()  # Object.Instantiate(Resources.Load("Special/marbleBackground"), BlockToWorldPos(Vector2(int(j), int(num18))), Quaternion.Euler(0.0, 0.0, Random.value * 360.0))',
     )
+    with open("rawr.tmp", "w") as f:
+        print(python, file=f)
     exec(python, gensettings.to_global_dict)
-
-
-def gen_block_circle(python, gensettings: GenerationSettings, *args, **kwargs):
-    pos, size, block, chance, chanceEnd = args
-    autoUpdateChunk = kwargs.get("autoUpdateChunk", False)
-    force = kwargs.get("force", False)
-    ignoreInfinirock = kwargs.get("ignoreInfinirock", False)
-
-    env = gensettings.to_global_dict | {
-        "pos": pos,
-        "size": size,
-        "block": block,
-        "chance": chance,
-        "chanceEnd": chanceEnd,
-        "autoUpdateChunk": autoUpdateChunk,
-        "force": force,
-        "ignoreInfinirock": ignoreInfinirock,
-    }
-
-    exec(python, env)
-
-    # with open("blockcircle.tmp", "w") as f:
-    #     print(python, file=f)
 
 
 def generate_world(
@@ -175,7 +154,7 @@ def generate_world(
 
     start_time = time.time()
     gensettings = GenerationSettings(
-        biomeDepth=1 - 1,
+        biomeDepth=3 - 1,
         width=1024,
         height=1024,
         chunkWidth=16,
@@ -205,36 +184,43 @@ def generate_world(
                 gen_terrain(genterr_python, gensettings)
 
     print(f"took {time.time()-start_time:.2f} to finish!")
-    show_world(gensettings, context.blockinfo)
-
-
-DECOMPILED_PATH = Path(__file__).parent / "Assembly-CSharp"
-ALL_MODULES = cache_output(load_modules, DECOMPILED_PATH)
-MODULE_INDEX = cache_output(load_module_index, ALL_MODULES)
-BLOCKINFO = get_blockinfo(ALL_MODULES, MODULE_INDEX)
-WORLDGEN_MODULE = "WorldGeneration"
-TRANSPILER = FunctionTranspiler(WORLDGEN_MODULE, ALL_MODULES, MODULE_INDEX)
-WORLDGEN_CONTEXT = WorldgenContext(
-    WORLDGEN_MODULE,
-    DECOMPILED_PATH,
-    ALL_MODULES,
-    MODULE_INDEX,
-    BLOCKINFO,
-    TRANSPILER,
-)
-randstate = [794495536, 2124554959, 1609843594, 2324523346]
-unity_random = UnityRandom(randstate)
-
-run_settings = RunSettings(
-    settings=run_setting(
-        "H4sIAAAAAAAACn2UTW7bQAyF76J1aihuUhS5Qc9QZEHNUBLh+QuHU8cpevdSzkJ/GS28kT88PvJx+Ptv80vQPzYvTQlmpJTQNg/3b+fmRbjgv4cZ6SCji1Eshkxym8H29LTkJsYXJ5QcIc/Y46ndyglD2sl9X3MTQ8EwKl8VA98RBnE0jLIwttIhj448Lf7/0a5VsgALhSGXNHnPFaX3NACFqhePAl10lD2D1C2PCE5rHTI9g5HCmDb1zs+rSTpEe6hDoUcjFENOuIy4hpkRgjmwRR2TczChh3V9jDZE9trpxxd0e1r3EUPJGlEH7CMvsW1KngIwDlgPAUTAXCx4GA7sUaABPGq3No9wWZDnTU0dcTI34/B4ghhM8R1P0zOQqlgWjpflfu3eGmvin+779zrWRzZ491ZnXLxOMeAffR8HFR29FbKp5FGXso5Zyj0NupJe5epYiHdXjNopfW7eDPfgMm72TpMQdJBF0w32gNVzYJF3C9rujoZSKunBx7J0ur8uCuoLi32v92jmvm0lJzGrqd4ON95Fc0mkP0ZDWfuuk3BD3XNLPX3Vz7YhvV4dyhUxoB6p8a3AaoHa088Vjj6hGtWg9o09r6WjntbjIVnsynCN7HbBvP4HLP+un0MGAAA="
+    print(gensettings.worldBlockEntities)
+    show_world(
+        gensettings,
+        context.blockinfo,
+        entities=gensettings.worldBlockEntities,
     )
-)
-# run_settings.settings["oreamount"] = 1000.0
-# print(run_settings.settings)
 
-generate_world(
-    run_settings,
-    WORLDGEN_CONTEXT,
-    unity_random,
-)
+
+if __name__ == "__main__":
+    DECOMPILED_PATH = Path(__file__).parent / "Assembly-CSharp"
+    ALL_MODULES = cache_output(load_modules, DECOMPILED_PATH)
+    MODULE_INDEX = cache_output(load_module_index, ALL_MODULES)
+    BLOCKINFO = get_blockinfo(ALL_MODULES, MODULE_INDEX)
+    WORLDGEN_MODULE = "WorldGeneration"
+    TRANSPILER = FunctionTranspiler(WORLDGEN_MODULE, ALL_MODULES, MODULE_INDEX)
+    WORLDGEN_CONTEXT = WorldgenContext(
+        WORLDGEN_MODULE,
+        DECOMPILED_PATH,
+        ALL_MODULES,
+        MODULE_INDEX,
+        BLOCKINFO,
+        TRANSPILER,
+    )
+    # randstate = [794495536, 2124554959, 1609843594, 2324523346]
+    randstate = splitmix64("nyan!")
+    unity_random = UnityRandom(randstate)
+
+    run_settings = RunSettings(
+        settings=run_setting(
+            "H4sIAAAAAAAACn2UTW7bQAyF76J1aihuUhS5Qc9QZEHNUBLh+QuHU8cpevdSzkJ/GS28kT88PvJx+Ptv80vQPzYvTQlmpJTQNg/3b+fmRbjgv4cZ6SCji1Eshkxym8H29LTkJsYXJ5QcIc/Y46ndyglD2sl9X3MTQ8EwKl8VA98RBnE0jLIwttIhj448Lf7/0a5VsgALhSGXNHnPFaX3NACFqhePAl10lD2D1C2PCE5rHTI9g5HCmDb1zs+rSTpEe6hDoUcjFENOuIy4hpkRgjmwRR2TczChh3V9jDZE9trpxxd0e1r3EUPJGlEH7CMvsW1KngIwDlgPAUTAXCx4GA7sUaABPGq3No9wWZDnTU0dcTI34/B4ghhM8R1P0zOQqlgWjpflfu3eGmvin+779zrWRzZ491ZnXLxOMeAffR8HFR29FbKp5FGXso5Zyj0NupJe5epYiHdXjNopfW7eDPfgMm72TpMQdJBF0w32gNVzYJF3C9rujoZSKunBx7J0ur8uCuoLi32v92jmvm0lJzGrqd4ON95Fc0mkP0ZDWfuuk3BD3XNLPX3Vz7YhvV4dyhUxoB6p8a3AaoHa088Vjj6hGtWg9o09r6WjntbjIVnsynCN7HbBvP4HLP+un0MGAAA="
+        )
+    )
+    # run_settings.settings["oreamount"] = 1000.0
+    # print(run_settings.settings)
+
+    generate_world(
+        run_settings,
+        WORLDGEN_CONTEXT,
+        unity_random,
+    )

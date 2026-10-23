@@ -11,8 +11,11 @@ class Vector2:
     left = None
     right = None
 
-    def __init__(self, x: int, y: int):
-        self.x, self.y = x, y
+    def __init__(self, x: int, y: int = None):
+        if y is None:
+            self.x, self.y = x[0], x[1]
+        else:
+            self.x, self.y = x, y
 
     def __repr__(self):
         return f"Vector2({self.x}, {self.y})"
@@ -24,8 +27,15 @@ class Vector2:
     def __add__(self, other):
         return Vector2(self.x + other.x, self.y + other.y)
 
+    def __radd__(self, other):
+        # print(self, Vector2(other))
+        return self + Vector2(other)
+
     def __sub__(self, other):
-        return Vector2(self.x - other.x, self.y - other.y)
+        try:
+            return Vector2(self.x - other.x, self.y - other.y)
+        except:
+            return Vector2(self.x - other[0], self.y - other[1])
 
     def __mul__(self, scalar: float):
         return Vector2(self.x * scalar, self.y * scalar)

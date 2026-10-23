@@ -201,6 +201,8 @@ def _get_single_prefab(name):
         if ladder_script is not None and box_collider is not None:
             tiling = box_collider.get("m_SpriteTilingProperty")
             entry["length"] = float(tiling["newSize"]["y"]) if tiling else None
+        else:
+            entry["length"] = -1  # noop for convenience sake
 
         entities.append(entry)
 
@@ -208,7 +210,6 @@ def _get_single_prefab(name):
 
 
 def _render_tilemap(tm, entities):
-
     to_show = tm
     viewer_data = SimpleNamespace(
         worldBlocks=to_show,
@@ -229,13 +230,13 @@ def _render_tilemap(tm, entities):
 
 # tm, blockentities = _get_single_prefab("structures/MedicalBuilding")
 # tm, blockentities = _get_single_prefab("structures/SteelBridge")
-tm, blockentities = _get_single_prefab("structures/BrickLoot")
+# tm, blockentities = _get_single_prefab("structures/BrickLoot")
 # tm, blockentities = _get_single_prefab("structures/SteelThing")
 # tm, blockentities = _get_single_prefab("structures/CrystalSpawnPlatform")
 # tm, blockentities = _get_single_prefab("Lifepod")
 # tm, blockentities = _get_single_prefab("BioContainer")
 # tm, blockentities = _get_single_prefab("Structures/LongCorridor")
 
-
-_render_tilemap(tm[0], blockentities)
+# print(blockentities)
+# _render_tilemap(tm[0], blockentities)
 # _get_single_prefab("BioContainer")

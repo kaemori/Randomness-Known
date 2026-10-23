@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+from functools import reduce
 import struct
 
 
@@ -71,6 +72,25 @@ class UnityRandom:
     def range_int(self, min_inclusive, max_exclusive):
         span = max_exclusive - min_inclusive
         if span == 0:
-            self.value()
+            self._next()
             return min_inclusive
         return min_inclusive + int(self.value * span)
+
+
+def splitmix64(seed: int):
+    def str_to_seed(s: str, base: int = 31, mod: int = 2**64) -> int:
+        return reduce(lambda acc, c: (acc * base + ord(c)) % mod, s, 0)
+
+    def next_val(z):
+        z = (z + 0x9E3779B97F4A7C15) & 0xFFFFFFFFFFFFFFFF
+        z = ((z ^ (z >> 30)) * 0xBF58476D1CE4E5B9) & 0xFFFFFFFFFFFFFFFF
+        z = ((z ^ (z >> 27)) * 0x94D049BB133111EB) & 0xFFFFFFFFFFFFFFFF
+        return z ^ (z >> 31)
+
+    seed = str_to_seed(seed) if isinstance(seed, str) else seed
+    z = seed & 0xFFFFFFFFFFFFFFFF
+    vals = []
+    for _ in range(4):
+        z = next_val(z)
+        vals.append(z & 0xFFFFFFFF)
+    return vals

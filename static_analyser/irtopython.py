@@ -7,6 +7,18 @@ from tools.collect_ternery import fix_ternary
 INDENT = "    "
 
 
+def _replace_csharp_booleans(text):
+    token = regex.compile(r'"(?:\\.|[^"\\])*"|\b(?:true|false)\b')
+
+    def replace(match):
+        value = match.group(0)
+        if value.startswith('"'):
+            return value
+        return value.capitalize()
+
+    return token.sub(replace, text)
+
+
 def expr_to_str(node):
     if node is None:
         return "None"
@@ -19,9 +31,17 @@ def expr_to_str(node):
         return f"{constructor}({expr_to_str(node.x)}, {expr_to_str(node.y)})"
     if isinstance(node, Vector3Node):
         return f"Vector3({expr_to_str(node.x)}, {expr_to_str(node.y)}, {expr_to_str(node.z)})"
+    if isinstance(node, RandomCall):
+        return (
+            f"Random.{node.member}({', '.join(expr_to_str(arg) for arg in node.args)})"
+        )
+    if isinstance(node, NoiseCall):
+        return f"{node.noise_var}.GetNoise({', '.join(expr_to_str(arg) for arg in node.args)})"
+    if isinstance(node, MethodCall):
+        return f"{node.target}({', '.join(expr_to_str(arg) for arg in node.args)})"
     raw = getattr(node, "raw", None)
     if raw is not None:
-        return raw
+        return _replace_csharp_booleans(raw)
     return repr(node)
 
 

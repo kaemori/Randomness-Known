@@ -153,7 +153,7 @@ class WorldViewer(tk.Tk):
         array_x = int(np.floor(self.offset_x + event.x / self.zoom))
         array_y = int(np.floor(self.offset_y + (ch - 1 - event.y) / self.zoom))
         if 0 <= array_x < self.width and 0 <= array_y < self.height:
-            self._cursor_block = array_x, self.height - 1 - array_y
+            self._cursor_block = array_x, array_y
         else:
             self._cursor_block = None
         self._update_status()
@@ -220,7 +220,7 @@ class WorldViewer(tk.Tk):
         tile_name = "-"
         if self._cursor_block is not None:
             cursor_x, cursor_y = self._cursor_block
-            block_id = int(self.world_blocks[cursor_x, self.height - 1 - cursor_y])
+            block_id = int(self.world_blocks[cursor_x, cursor_y])
             tile_name = self.blockinfo.get(block_id, f"unknown({block_id})")
         self.status_var.set(
             f"zoom={self.zoom:.2f}px/block  pos=({position})  tile={tile_name}  mode={mode}"
