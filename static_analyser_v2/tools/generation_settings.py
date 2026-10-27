@@ -66,12 +66,19 @@ def accessible_as(fn=None, *, name=None):
     return decorator(fn) if fn is not None else decorator
 
 
-def noop(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        return Plaything()
+def noop(func=None, *, pass_args=False):
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            if pass_args:
+                f(*args, **kwargs)
+            else:
+                f(*args[:1])
+            return Plaything()
 
-    return wrapper
+        return wrapper
+
+    return decorator(func) if func is not None else decorator
 
 
 @dataclass(frozen=True)
@@ -157,8 +164,8 @@ class GenerationSettings:
         print("update world!")
 
     @accessible_as
-    @noop
-    def PlaceLiquids(self):
+    @noop(pass_args=True)
+    def PlaceLiquids(self, perchunk, type, maxfill):
         print("PlaceLiquids")
 
     # generate env

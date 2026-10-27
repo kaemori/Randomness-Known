@@ -42,8 +42,8 @@ file = "\n".join(
     ]
 )
 
-with open("genterr.py", "w") as f:
-    print(file, file=f)
+# with open("genterr.py", "w") as f:
+#     print(file, file=f)
 
 exec(file, gensettings.to_global_dict)
 
