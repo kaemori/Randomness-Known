@@ -442,8 +442,8 @@ def show_world(
     if id_color_mapping is None:
         id_color_mapping = _get_id_color_mapping(blockinfo)
     app = WorldViewer(
-        gensettings.worldBlocks,
-        gensettings.fluid,
+        gensettings["worldBlocks"],
+        gensettings["fluid"],
         blockinfo,
         id_image_mapping,
         id_color_mapping,

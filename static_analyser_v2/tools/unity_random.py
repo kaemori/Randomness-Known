@@ -21,9 +21,9 @@ class UnityRandom:
             self.s2 = s2 & MASK
             self.s3 = s3 & MASK
 
-    @staticmethod
-    def splitmixed(seedstring):
-        return UnityRandom(splitmix64(seedstring))
+    @classmethod
+    def splitmixed(cls, seedstring):
+        return cls(splitmix64(seedstring))
 
     @staticmethod
     def xorshift128(s0, s1, s2, s3):

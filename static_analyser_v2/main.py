@@ -1,11 +1,28 @@
+from pathlib import Path
+
 from cparser.csfunc import (
     module_init,
     getfunc_as_tree,
 )
 from cparser.transpiler import transpile_method
 from tools.unity_random import UnityRandom
-from tools.generation_settings import GenerationSettings, RunSettings
+from tools.generation_settings import RunSettings, generation_settings
 from tools import textureloader
+
+DUMP_DIR = Path("temp_gen")
+_dumped_files = []
+
+
+def load_csfunc(module, func, replacements):
+    transpiled = transpile_method(getfunc_as_tree(module, func))
+    for replacement_pair in replacements:
+        transpiled = transpiled.replace(*replacement_pair)
+    path = DUMP_DIR / f"{module}_{func}.py"
+    if not path in _dumped_files:
+        path.write_text(transpiled)
+        _dumped_files.append(path)
+    return transpiled
+
 
 unity_random = UnityRandom.splitmixed("purr")
 run_settings = RunSettings.from_preset_str(
@@ -13,7 +30,7 @@ run_settings = RunSettings.from_preset_str(
 )
 
 
-gensettings = GenerationSettings(
+gensettings = generation_settings(
     biomeDepth=3 - 1,
     width=1024,
     height=1024,
@@ -24,28 +41,29 @@ gensettings = GenerationSettings(
 )
 
 module_init()
+MODULE = "WorldGeneration"
 textureloader.copy_icon_images(textureloader.get_blockinfo())
 textureloader.copy_entity_images()
-file = transpile_method(
-    getfunc_as_tree("WorldGeneration", "WorldGenerateTerrain")
-).replace("int.MaxValue", "0x7FFFFFFF")
 
 
-file = "\n".join(
-    [
+gen_terrain = load_csfunc(
+    MODULE,
+    "WorldGenerateTerrain",
+    (
+        ("int.MaxValue", "0x7FFFFFFF"),
         (
-            line
-            if "Resources.Load('Special/marbleBackground')" not in line
-            else f"{(len(line) - len(line.lstrip())) * ' '}UnityEngine.Random.value  # step value"
-        )
-        for line in file.splitlines()
-    ]
+            "UnityEngine.Object.Instantiate(Resources.Load('Special/marbleBackground'), BlockToWorldPos(Vector2Int(num16, num17)), Quaternion.Euler(0.0, 0.0, UnityEngine.Random.value * 360.0))",
+            "UnityEngine.Random.value",
+        ),
+    ),
 )
 
-# with open("genterr.py", "w") as f:
-#     print(file, file=f)
 
-exec(file, gensettings.to_global_dict)
+import time
+
+start_time = time.time()
+exec(gen_terrain, gensettings)
+print(time.time() - start_time)
 
 from spectra2 import show_world
 
