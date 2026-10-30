@@ -1,5 +1,3 @@
-from types import SimpleNamespace
-
 from tools.vectors import Vector2, Vector3
 
 
@@ -33,11 +31,16 @@ class Object:
         print(f"{who} instantiated at {where} facing {whichdirectiongoddamn}")
 
 
+class UnityEngine:
+    __slots__ = ("Random", "Mathf", "Object", "Vector2", "Vector3")
+
+    def __init__(self, random):
+        self.Random = random
+        self.Mathf = Mathf
+        self.Object = Object
+        self.Vector2 = Vector2
+        self.Vector3 = Vector3
+
+
 def make_unity_engine(random):
-    return SimpleNamespace(
-        Random=random,
-        Mathf=Mathf,
-        Object=Object,
-        Vector2=Vector2,
-        Vector3=Vector3,
-    )
+    return UnityEngine(random)

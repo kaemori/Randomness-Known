@@ -362,9 +362,9 @@ class WorldFile:
     tile_size: int = 8
 
     @classmethod
-    def from_gensettings(
+    def from_world_state(
         cls,
-        gensettings,
+        world_state,
         blockinfo,
         id_image_mapping=None,
         id_color_mapping=None,
@@ -372,19 +372,21 @@ class WorldFile:
         tile_size=8,
     ):
         return cls(
-            world_blocks=gensettings.worldBlocks,
-            fluid=gensettings.fluid,
+            world_blocks=world_state.world_blocks,
+            fluid=world_state.fluid,
             blockinfo=blockinfo,
             id_image_mapping=id_image_mapping,
             id_color_mapping=id_color_mapping,
             entities=(
                 entities
                 if entities is not None
-                else getattr(gensettings, "worldBlockEntities", [])
+                else getattr(world_state, "world_block_entities", [])
             ),
-            debug_crosses=getattr(gensettings, "debug_crosses", []),
+            debug_crosses=getattr(world_state, "debug_crosses", []),
             tile_size=tile_size,
         )
+
+    from_gensettings = from_world_state
 
     def save(self, path="worldsaved.bin"):
         with open(path, "wb") as f:
@@ -425,7 +427,7 @@ class WorldFile:
 
 # backwards compat
 def show_world(
-    gensettings,
+    world_state,
     blockinfo,
     id_image_mapping=None,
     id_color_mapping=None,
@@ -442,13 +444,13 @@ def show_world(
     if id_color_mapping is None:
         id_color_mapping = _get_id_color_mapping(blockinfo)
     app = WorldViewer(
-        gensettings["worldBlocks"],
-        gensettings["fluid"],
+        world_state.world_blocks,
+        world_state.fluid,
         blockinfo,
         id_image_mapping,
         id_color_mapping,
         entities=entities,
-        debug_crosses=getattr(gensettings, "debug_crosses", []),
+        debug_crosses=getattr(world_state, "debug_crosses", []),
         tile_size=tile_size,
     )
     app.mainloop()

@@ -6,7 +6,9 @@ from cparser.csfunc import (
 )
 from cparser.transpiler import transpile_method
 from tools.unity_random import UnityRandom
-from tools.generation_settings import RunSettings, generation_settings
+from tools.generation_environment import build_environment
+from tools.run_settings import RunSettings
+from tools.world_state import WorldState
 from tools import textureloader
 
 DUMP_DIR = Path("temp_gen")
@@ -30,14 +32,14 @@ run_settings = RunSettings.from_preset_str(
 )
 
 
-gensettings = generation_settings(
-    biomeDepth=3 - 1,
+world_state = WorldState.create(
+    biome_depth=3 - 1,
     width=1024,
     height=1024,
-    chunkWidth=16,
-    chunkHeight=16,
+    chunk_width=16,
+    chunk_height=16,
     run_settings=run_settings,
-    Random=unity_random,
+    random=unity_random,
 )
 
 module_init()
@@ -62,9 +64,9 @@ gen_terrain = load_csfunc(
 import time
 
 start_time = time.time()
-exec(gen_terrain, gensettings)
+exec(gen_terrain, build_environment(world_state))
 print(time.time() - start_time)
 
 from spectra2 import show_world
 
-show_world(gensettings, textureloader.get_blockinfo())
+show_world(world_state, textureloader.get_blockinfo())
