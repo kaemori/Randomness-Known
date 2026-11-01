@@ -6,23 +6,29 @@ from cparser.csfunc import (
 )
 from cparser.transpiler import transpile_method
 from tools.unity_random import UnityRandom
-from tools.generation_environment import build_environment
+from tools.generation_environment import Environment
 from tools.run_settings import RunSettings
 from tools.world_state import WorldState
 from tools import textureloader
 
+from staticfunc.liqfiller import place_liquids
+
 DUMP_DIR = Path("temp_gen")
+DUMP_DIR.mkdir(exist_ok=True)
 _dumped_files = []
 
 
-def load_csfunc(module, func, replacements):
-    transpiled = transpile_method(getfunc_as_tree(module, func))
+def load_csfunc(module, func, replacements={}, danger_retasext=False, istfg=False):
+    transpiled = transpile_method(
+        getfunc_as_tree(module, func), danger_return_as_exit=danger_retasext
+    )
     for replacement_pair in replacements:
         transpiled = transpiled.replace(*replacement_pair)
-    path = DUMP_DIR / f"{module}_{func}.py"
-    if not path in _dumped_files:
-        path.write_text(transpiled)
-        _dumped_files.append(path)
+    if istfg:
+        path = DUMP_DIR / f"{module}_{func}.py"
+        if not path in _dumped_files:
+            path.write_text(transpiled)
+            _dumped_files.append(path)
     return transpiled
 
 
@@ -61,11 +67,18 @@ gen_terrain = load_csfunc(
 )
 
 
-import time
+def gen_ores(env):
+    try:
+        exec(load_csfunc(MODULE, "GenerateOres", danger_retasext=True), env.as_dict)
+    except SystemExit:
+        pass
 
-start_time = time.time()
-exec(gen_terrain, build_environment(world_state))
-print(time.time() - start_time)
+
+env = Environment(world_state, pl_fn=place_liquids, go_fn=gen_ores)
+# from cProfile import run
+
+# run("exec(gen_terrain, env.as_dict)", "nya.prof")
+exec(gen_terrain, env.as_dict)
 
 from spectra2 import show_world
 

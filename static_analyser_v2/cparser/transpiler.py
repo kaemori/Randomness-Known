@@ -319,7 +319,27 @@ class Transpiler:
         return self.s_expression_statement(Fake)
 
 
-def transpile_method(method_node, as_function=False):
+PROPERTY_MAP = {
+    "SetNoiseType": "noise_type",
+    "SetFractalType": "fractal_type",
+    "SetFrequency": "frequency",
+    "SetFractalOctaves": "fractal_octaves",
+    "SetFractalLacunarity": "fractal_lacunarity",
+    "SetCellularDistanceFunction": "cellular_distance_function",
+    "SetCellularReturnType": "cellular_return_type",
+    "SetCellularJitter": "cellular_jitter",
+    "SetFractalGain": "fractal_gain",
+    "SetFractalWeightedStrength": "fractal_weighted_strength",
+}
+ENUM_PREFIXES = {
+    "FastNoiseLite.NoiseType.": "NoiseType.NoiseType_",
+    "FastNoiseLite.FractalType.": "FractalType.FractalType_",
+    "FastNoiseLite.CellularDistanceFunction.": "CellularDistanceFunction.CellularDistanceFunction_",
+    "FastNoiseLite.CellularReturnType.": "CellularReturnType.CellularReturnType_",
+}
+
+
+def transpile_method(method_node, danger_return_as_exit=False, as_function=False):
     """note to self, use getfunc_as_tree"""
     tp = Transpiler()
     name = tp.t(method_node.child_by_field_name("name"))
@@ -338,4 +358,11 @@ def transpile_method(method_node, as_function=False):
     else:
         mod = ast.fix_missing_locations(ast.Module(body, []))
 
-    return re.sub(r"<(\S*?)>", r"(\1)", ast.unparse(mod))
+    tx = re.sub(r"<(\S*?)>", r"(\1)", ast.unparse(mod))
+    if danger_return_as_exit:
+        tx = tx.replace("return", "exit()")
+    # for k, v in (PROPERTY_MAP | ENUM_PREFIXES).items():
+    #     tx = tx.replace(k, v)
+    # tx = tx.replace("UnityEngine.Random", "Random")
+
+    return tx
