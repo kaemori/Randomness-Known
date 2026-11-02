@@ -1,0 +1,9 @@
+llvmlite==0.50.0
+numba==0.68.1
+numpy==2.5.4
+pillow==13.0.0
+pyfastnoiselite @ git+https://github.com/kaemori/PyFastNoiseLite.git@d16b0c1ebb13573fa531f28877bbb114de6f8ade
+pyyaml==6.0.3
+regex==2026.9.29
+tree-sitter==0.26.0
+tree-sitter-c-sharp==0.23.5
