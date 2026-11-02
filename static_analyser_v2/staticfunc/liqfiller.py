@@ -28,6 +28,7 @@ def _union(parent, size, head, tail, nxt, a, b):
     tail[ra] = new_tail
 
 
+# liquid fill
 @njit(cache=True)
 def _fill_net(air):
     W, H = air.shape
@@ -40,6 +41,8 @@ def _fill_net(air):
 
     seg_head = np.full((W, H), -1, dtype=np.int32)
     out = np.zeros((W, H), dtype=np.uint32)
+    ground = np.full((W, H), -1, dtype=np.int32)
+    last = np.full(W, -1, dtype=np.int32)
 
     for y in range(H - 1, -1, -1):
         for x in range(W):
@@ -55,6 +58,10 @@ def _fill_net(air):
                 r = _find(parent, x * H + y)
                 out[x, y] = size[r]
                 seg_head[x, y] = head[r]
+                if last[x] >= 0:
+                    ground[x, y] = H - 1 - last[x]
+            else:
+                last[x] = y
 
     total = 0
     for x in range(W):
@@ -78,16 +85,17 @@ def _fill_net(air):
         for y in range(H):
             if air[x, y]:
                 start[x, y] = pos[seg_head[x, y]]
-    return out, start, order
+    return out, start, order, ground
 
 
 def ensure_fillnet(env):
     if env.fillnet is not None:
         return
-    size, start, order = _fill_net(env.worldBlocks[:, ::-1] == 0)
+    size, start, order, ground = _fill_net(env.worldBlocks[:, ::-1] == 0)
     env.fillnet = size[:, ::-1]
     env.fillstart = start[:, ::-1]
     env.fillorder = order
+    env.groundy = ground[:, ::-1]
 
 
 def cached_fill(env, x, y, fill, max_fill):
@@ -105,6 +113,13 @@ def cached_fill(env, x, y, fill, max_fill):
     return True
 
 
+def first_solid_below(env, x, y):
+    ensure_fillnet(env)
+    by = int(env.groundy[x, y])
+    return (x, by) if by >= 0 else (-1, -1)
+
+
+# liquid fns
 def place_liquids(env, per_chunk, liquid_type, max_fill):
     ensure_fillnet(env)
     half_w, half_h = env.width // 2, env.height // 2

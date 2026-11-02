@@ -39,7 +39,7 @@ run_settings = RunSettings.from_preset_str(
 
 
 world_state = WorldState.create(
-    biome_depth=3 - 1,
+    biome_depth=4 - 1,
     width=1024,
     height=1024,
     chunk_width=16,

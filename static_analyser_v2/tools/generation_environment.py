@@ -30,6 +30,7 @@ class Environment:
         "fillnet",
         "fillstart",
         "fillorder",
+        "groundy",
         "biomeDepth",
         "width",
         "height",
@@ -69,6 +70,7 @@ class Environment:
         self.fillnet = None
         self.fillstart = None
         self.fillorder = None
+        self.groundy = None
 
         self.biomeDepth = ws.biome_depth
         self.width = ws.width

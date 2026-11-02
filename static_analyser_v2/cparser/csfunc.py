@@ -70,7 +70,7 @@ def _extract_methods(modbytes, root):
 
 @showtime
 def module_init(
-    decom_path=r"casproject\Assets\Scripts\Assembly-CSharp",
+    decom_path=None,
     cache_path=None,
     use_cache=True,
 ):
@@ -79,7 +79,13 @@ def module_init(
     _lang = Language(tscs.language())
     _parser = Parser(_lang)
 
-    _decompiled_path = Path(decom_path)
+    _decompiled_path = (
+        Path(decom_path)
+        if decom_path is not None
+        else Path().cwd() / "casproject" / "Assets" / "Scripts" / "Assembly-CSharp"
+    )
+    if not _decompiled_path.exists():
+        raise NotADirectoryError("check yo path")
     _modules = {file.stem: Path(file) for file in _decompiled_path.glob("*.cs")}
     _module_trees = {}
     _module_index = {}
