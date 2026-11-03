@@ -20,6 +20,12 @@ class WorldState:
     biome_override: float
     override_scene_type: object
 
+    def __post_init__(self):
+        if self.biome_depth == 0:
+            _rd = self.random
+            for _ in range(412):
+                _rd.value
+
     @classmethod
     def create(
         cls,
@@ -42,7 +48,9 @@ class WorldState:
             random=random,
             world_blocks=np.zeros((width, height), dtype=np.uint16),
             fluid=np.zeros((width, height), dtype=np.uint8),
-            biome_override=float("nan"),
+            # biome_override=float("nan"),
+            # biome_override='"theliteralNone"',
+            biome_override=None,
             override_scene_type=Plaything(),
         )
 

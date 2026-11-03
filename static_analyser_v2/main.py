@@ -1,4 +1,5 @@
 from pathlib import Path
+from functools import partial
 import time
 
 from cparser.csfunc import (
@@ -7,19 +8,20 @@ from cparser.csfunc import (
 )
 from cparser.transpiler import transpile_method
 from tools.unity_random import UnityRandom
+from tools.unity_shim import Plaything
 from tools.generation_environment import Environment
 from tools.run_settings import RunSettings
 from tools.world_state import WorldState
 from tools import textureloader
 
-from staticfunc.liqfiller import place_liquids
+from staticfunc.liqfiller import place_liquids, first_solid_below, ensure_groundy
 
 DUMP_DIR = Path("temp_gen")
 DUMP_DIR.mkdir(exist_ok=True)
 _dumped_files = []
 
 
-def load_csfunc(module, func, replacements={}, danger_retasext=False, istfg=False):
+def load_csfunc(module, func, replacements={}, danger_retasext=False, istfg=True):
     transpiled = transpile_method(
         getfunc_as_tree(module, func), danger_return_as_exit=danger_retasext
     )
@@ -55,17 +57,66 @@ textureloader.copy_icon_images(textureloader.get_blockinfo())
 textureloader.copy_entity_images()
 
 
-gen_terrain = load_csfunc(
-    MODULE,
-    "WorldGenerateTerrain",
-    (
-        ("int.MaxValue", "0x7FFFFFFF"),
+def gen_terr(env):
+    gen_terrain = load_csfunc(
+        MODULE,
+        "WorldGenerateTerrain",
         (
-            "UnityEngine.Object.Instantiate(Resources.Load('Special/marbleBackground'), BlockToWorldPos(Vector2Int(num16, num17)), Quaternion.Euler(0.0, 0.0, UnityEngine.Random.value * 360.0))",
-            "UnityEngine.Random.value",
+            ("int.MaxValue", "0x7FFFFFFF"),
+            (
+                "UnityEngine.Object.Instantiate(Resources.Load('Special/marbleBackground'), BlockToWorldPos(Vector2Int(num16, num17)), Quaternion.Euler(0.0, 0.0, UnityEngine.Random.value * 360.0))",
+                "UnityEngine.Random.value",
+            ),
         ),
-    ),
-)
+        danger_retasext=True,
+    )
+    try:
+        exec(gen_terrain, env.as_dict)
+    except SystemExit:
+        pass
+
+
+def _raycast(groundy, vector, direction, maxdist, _):
+    if direction.x == 0 and direction.y == -1:
+        print(vector.x, vector.y)
+        itm = groundy[vector.x + 512, vector.y + 512]
+        if itm == -1:
+            return None
+        return (vector.x - 512, itm - 512)
+    raise NotImplementedError
+
+
+def gen_structs(env):
+    # theres a return at "if biomeDepth != 7"??
+    ensure_groundy(env)
+
+    getsetting = env.WorldGeneration.GetRunSettingFloat
+    raycast = partial(_raycast, env.groundy)
+    gen_struct = load_csfunc(
+        MODULE,
+        "WorldGenerateStructures",
+        (
+            ("OverrideSceneType.None", "None"),
+            ("Physics2D.Raycast", "Raycast"),
+            (".point", ""),
+        ),
+        danger_retasext=True,
+    )
+    try:
+        exec(
+            gen_struct,
+            env.as_dict
+            | {
+                "totalLootRarity": (
+                    getsetting("baselootdensity")
+                    * (getsetting("lootmultiplier") ** (env.biomeDepth + 1))
+                ),
+                "Raycast": raycast,
+                "LayerMask": Plaything(),
+            },
+        )
+    except SystemExit:
+        pass
 
 
 def gen_ores(env):
@@ -75,13 +126,13 @@ def gen_ores(env):
         pass
 
 
-env = Environment(world_state, pl_fn=place_liquids, go_fn=gen_ores)
-# env = Environment(world_state, go_fn=gen_ores)
+env = Environment(world_state, pl_fn=place_liquids, wgs_fn=gen_structs, go_fn=gen_ores)
+# env = Environment(world_state, pl_fn=place_liquids, wgs_fn=gen_structs)
 
 
 st = time.time()
-__import__("cProfile").run("exec(gen_terrain, env.as_dict)", "nya.prof")
-# exec(gen_terrain, env.as_dict)
+# __import__("cProfile").run("exec(gen_terrain, env.as_dict)", "nya.prof")
+gen_terr(env)
 print(time.time() - st, env.Random._count)
 
 from spectra2 import show_world, WorldFile

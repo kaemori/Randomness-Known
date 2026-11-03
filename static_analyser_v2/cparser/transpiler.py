@@ -226,10 +226,11 @@ class Transpiler:
         return self.block(n)
 
     def s_yield_statement(self, n):
-        return []
-        # if n.named_children:
-        #     return [ast.Expr(ast.Yield(self.expr(n.named_children[0])))]
-        # return [ast.Return()]
+        # return []
+        if n.named_children:
+            return [ast.Expr(self.expr(n.named_children[0]))]
+            # return [ast.Expr(ast.Yield(self.expr(n.named_children[0])))]
+        return [ast.Return()]
 
     def s_if_statement(self, n):
         g = n.child_by_field_name

@@ -25,11 +25,13 @@ class Vector2:
         yield self.y
 
     def __add__(self, other):
-        return Vector2(self.x + other.x, self.y + other.y)
+        if isinstance(other, Vector2):
+            return Vector2(self.x + other.x, self.y + other.y)
+        return Vector2(self.x + other[0], self.y + other[1])
 
     def __radd__(self, other):
         # print(self, Vector2(other))
-        return self + Vector2(other)
+        return self + other
 
     def __sub__(self, other):
         try:

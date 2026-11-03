@@ -30,6 +30,20 @@ def _union(parent, size, head, tail, nxt, a, b):
 
 # nts: y=0 is bottom
 @njit(cache=True)
+def _ground_y(air):
+    W, H = air.shape
+    ground = np.full((W, H), -1, dtype=np.int32)
+    for x in range(W):
+        last_solid = -1
+        for y in range(H):
+            if air[x, y]:
+                ground[x, y] = last_solid
+            else:
+                last_solid = y
+    return ground
+
+
+@njit(cache=True)
 def _fill_net(air):
     W, H = air.shape
     n = W * H
@@ -41,8 +55,6 @@ def _fill_net(air):
 
     seg_head = np.full((W, H), -1, dtype=np.int32)
     out = np.zeros((W, H), dtype=np.uint32)
-    ground = np.full((W, H), -1, dtype=np.int32)
-    last_floor_solid = np.full(W, -1, dtype=np.int32)
 
     for y in range(H):
         for x in range(W):
@@ -58,9 +70,6 @@ def _fill_net(air):
                 r = _find(parent, x * H + y)
                 out[x, y] = size[r]
                 seg_head[x, y] = head[r]
-                ground[x, y] = last_floor_solid[x]
-            else:
-                last_floor_solid[x] = y
 
     total = 0
     for x in range(W):
@@ -84,15 +93,25 @@ def _fill_net(air):
         for y in range(H):
             if air[x, y]:
                 start[x, y] = pos[seg_head[x, y]]
-    return out, start, order, ground
+    return out, start, order
 
 
 def ensure_fillnet(env):
     if env.fillnet is not None:
         return
-    env.fillnet, env.fillstart, env.fillorder, env.groundy = _fill_net(
-        env.worldBlocks == 0
-    )
+    env.fillnet, env.fillstart, env.fillorder = _fill_net(env.worldBlocks == 0)
+
+
+def ensure_groundy(env):
+    if getattr(env, "groundy", None) is not None:
+        return
+    env.groundy = _ground_y(env.worldBlocks == 0)
+
+
+def first_solid_below(env, x, y):
+    ensure_groundy(env)
+    by = int(env.groundy[x, y])
+    return (x, by) if by >= 0 else (-1, -1)
 
 
 def cached_fill(env, x, y, fill, max_fill):
@@ -108,12 +127,6 @@ def cached_fill(env, x, y, fill, max_fill):
     keep = env.fluid[xs, ys] == 0
     env.fluid[xs[keep], ys[keep]] = fill
     return True
-
-
-def first_solid_below(env, x, y):
-    ensure_fillnet(env)
-    by = int(env.groundy[x, y])
-    return (x, by) if by >= 0 else (-1, -1)
 
 
 # liquid fns

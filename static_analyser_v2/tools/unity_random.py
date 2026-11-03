@@ -69,9 +69,9 @@ class UnityRandom:
         return to_f32((self._next() & 0x7FFFFF) / 0x7FFFFF)
 
     def Range(self, a, b):
-        if isinstance(a, float) or isinstance(b, float):
-            return self.range_float(a, b)
-        return self.range_int(a, b)
+        if isinstance(a, int) and b.is_integer():
+            return self.range_int(a, b)
+        return self.range_float(a, b)
 
     def range_float(self, min_val, max_val):
         return min_val + self.value * (max_val - min_val)
