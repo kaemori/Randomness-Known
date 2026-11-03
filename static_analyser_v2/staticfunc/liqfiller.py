@@ -28,7 +28,7 @@ def _union(parent, size, head, tail, nxt, a, b):
     tail[ra] = new_tail
 
 
-# liquid fill
+# nts: y=0 is bottom
 @njit(cache=True)
 def _fill_net(air):
     W, H = air.shape
@@ -42,26 +42,25 @@ def _fill_net(air):
     seg_head = np.full((W, H), -1, dtype=np.int32)
     out = np.zeros((W, H), dtype=np.uint32)
     ground = np.full((W, H), -1, dtype=np.int32)
-    last = np.full(W, -1, dtype=np.int32)
+    last_floor_solid = np.full(W, -1, dtype=np.int32)
 
-    for y in range(H - 1, -1, -1):
+    for y in range(H):
         for x in range(W):
             if not air[x, y]:
                 continue
             i = x * H + y
             if x > 0 and air[x - 1, y]:
                 _union(parent, size, head, tail, nxt, i, i - H)
-            if y + 1 < H and air[x, y + 1]:
-                _union(parent, size, head, tail, nxt, i, i + 1)
+            if y > 0 and air[x, y - 1]:
+                _union(parent, size, head, tail, nxt, i, i - 1)
         for x in range(W):
             if air[x, y]:
                 r = _find(parent, x * H + y)
                 out[x, y] = size[r]
                 seg_head[x, y] = head[r]
-                if last[x] >= 0:
-                    ground[x, y] = H - 1 - last[x]
+                ground[x, y] = last_floor_solid[x]
             else:
-                last[x] = y
+                last_floor_solid[x] = y
 
     total = 0
     for x in range(W):
@@ -91,11 +90,9 @@ def _fill_net(air):
 def ensure_fillnet(env):
     if env.fillnet is not None:
         return
-    size, start, order, ground = _fill_net(env.worldBlocks[:, ::-1] == 0)
-    env.fillnet = size[:, ::-1]
-    env.fillstart = start[:, ::-1]
-    env.fillorder = order
-    env.groundy = ground[:, ::-1]
+    env.fillnet, env.fillstart, env.fillorder, env.groundy = _fill_net(
+        env.worldBlocks == 0
+    )
 
 
 def cached_fill(env, x, y, fill, max_fill):
@@ -107,8 +104,8 @@ def cached_fill(env, x, y, fill, max_fill):
     s = int(env.fillstart[x, y])
     idx = env.fillorder[s : s + n]
     xs = idx // H
-    ys = H - 1 - idx % H
-    keep = (xs >= 1) & (ys >= 1) & (env.fluid[xs, ys] == 0)
+    ys = idx % H
+    keep = env.fluid[xs, ys] == 0
     env.fluid[xs[keep], ys[keep]] = fill
     return True
 

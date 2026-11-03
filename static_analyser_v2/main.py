@@ -1,4 +1,5 @@
 from pathlib import Path
+import time
 
 from cparser.csfunc import (
     module_init,
@@ -39,7 +40,7 @@ run_settings = RunSettings.from_preset_str(
 
 
 world_state = WorldState.create(
-    biome_depth=4 - 1,
+    biome_depth=1 - 1,
     width=1024,
     height=1024,
     chunk_width=16,
@@ -75,11 +76,18 @@ def gen_ores(env):
 
 
 env = Environment(world_state, pl_fn=place_liquids, go_fn=gen_ores)
-# from cProfile import run
+# env = Environment(world_state, go_fn=gen_ores)
 
-# run("exec(gen_terrain, env.as_dict)", "nya.prof")
+
+st = time.time()
+# __import__("cProfile").run("exec(gen_terrain, env.as_dict)", "nya.prof")
 exec(gen_terrain, env.as_dict)
+print(time.time() - st, env.Random._count)
 
-from spectra2 import show_world
+from spectra2 import show_world, WorldFile
+
+# WorldFile(
+#     world_state.world_blocks, world_state.fluid, textureloader.get_blockinfo()
+# ).save()
 
 show_world(world_state, textureloader.get_blockinfo())

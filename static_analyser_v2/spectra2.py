@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from tkinter import ttk
 import numpy as np
-from PIL import Image, ImageDraw, ImageTk
+from PIL import Image, ImageDraw, ImageFont, ImageTk
 
 to_rgb = lambda x: tuple(int(x[i : i + 2], 16) for i in (0, 2, 4))
 FLUID_COLORS = {1: to_rgb("223355"), 2: to_rgb("224400"), 3: to_rgb("111111")}
@@ -111,6 +111,16 @@ class WorldViewer(tk.Tk):
         self._render_pending = False
         self._fitted = False
         self._last_status = None
+        self._search_mode = False
+        self._search_text = ""
+        self._search_positions = np.empty((0, 2), dtype=np.intp)
+        self._search_cache_id = None
+        self._highlight_all = False
+        self._cursor_px = None
+        try:
+            self._font = ImageFont.load_default(size=14)
+        except TypeError:  # older Pillow
+            self._font = ImageFont.load_default()
         self._build_ui()
 
     def _make_overview(self):
@@ -162,6 +172,10 @@ class WorldViewer(tk.Tk):
         status.pack(fill="x")
         self.status_var = tk.StringVar(value="")
         ttk.Label(status, textvariable=self.status_var).pack(side="left", padx=6)
+        self.search_status_var = tk.StringVar(value="")
+        ttk.Label(status, textvariable=self.search_status_var, anchor="e").pack(
+            side="right", padx=6
+        )
         self.canvas.bind("<Configure>", self._on_configure)
         self.canvas.bind("<ButtonPress-1>", self._on_drag_start)
         self.canvas.bind("<B1-Motion>", self._on_drag_move)
@@ -170,6 +184,7 @@ class WorldViewer(tk.Tk):
         self.canvas.bind("<Button-4>", lambda e: self._on_zoom(e, 1))
         self.canvas.bind("<Button-5>", lambda e: self._on_zoom(e, -1))
         self.bind("<Key-r>", lambda e: (self._fit_to_window(), self.request_render()))
+        self.bind("<Key>", self._on_key)
 
     def _on_configure(self, event):
         if not self._fitted:
@@ -196,6 +211,7 @@ class WorldViewer(tk.Tk):
         self.request_render()
 
     def _on_motion(self, event):
+        self._cursor_px = (event.x, event.y)
         ch = self.canvas.winfo_height() or 1
         x = int(np.floor(self.offset_x + event.x / self.zoom))
         y = int(np.floor(self.offset_y + (ch - 1 - event.y) / self.zoom))
@@ -203,6 +219,62 @@ class WorldViewer(tk.Tk):
             (x, y) if 0 <= x < self.width and 0 <= y < self.height else None
         )
         self._update_status()
+        if self._search_mode:
+            self.request_render()
+
+    def _on_key(self, event):
+        if event.keysym.lower() == "f":
+            self._search_mode = not self._search_mode
+            self._search_text = ""
+            self._search_cache_id = None
+        elif event.keysym.lower() == "g":
+            self._highlight_all = not self._highlight_all
+        elif self._search_mode:
+            if event.char.isdigit():
+                if len(self._search_text) >= 2:  # start a fresh id
+                    self._search_text = ""
+                self._search_text += event.char
+            elif event.keysym == "BackSpace":
+                self._search_text = self._search_text[:-1]
+        else:
+            return
+        self.request_render()
+
+    def _search_target(self):
+        """Nearest block of the searched id to the cursor block, or None."""
+        if not self._search_text:
+            return None
+        bid = int(self._search_text)
+        if self._search_cache_id != bid:
+            self._search_cache_id = bid
+            self._search_positions = np.argwhere(self.world_blocks == bid)
+        pos = self._search_positions
+        if len(pos) == 0 or self._cursor_block is None:
+            return None
+        d = ((pos - np.array(self._cursor_block)) ** 2).sum(axis=1)
+        return tuple(int(v) for v in pos[d.argmin()])
+
+    def _draw_search(self, image, cw, ch):
+        if not self._search_mode:
+            return
+        draw = ImageDraw.Draw(image)
+        target = self._search_target()
+        if self._highlight_all and self._search_text:
+            r = max(2, round(self.zoom / 2))
+            for bx, by in self._search_positions:
+                tx = round((int(bx) + 0.5 - self.offset_x) * self.zoom)
+                ty = round(ch - (int(by) + 0.5 - self.offset_y) * self.zoom)
+                if tx + r < 0 or tx - r > cw or ty + r < 0 or ty - r > ch:
+                    continue
+                draw.ellipse(
+                    (tx - r, ty - r, tx + r, ty + r), outline="#999933", width=1
+                )
+        if target is not None and self._cursor_px is not None:
+            tx = round((target[0] + 0.5 - self.offset_x) * self.zoom)
+            ty = round(ch - (target[1] + 0.5 - self.offset_y) * self.zoom)
+            draw.line((*self._cursor_px, tx, ty), fill="#ffff33", width=2)
+            r = max(4, round(self.zoom / 2))
+            draw.ellipse((tx - r, ty - r, tx + r, ty + r), outline="#ffff33", width=2)
 
     def _on_zoom(self, event, direction=None):
         if direction is None:
@@ -280,6 +352,7 @@ class WorldViewer(tk.Tk):
             rgb[~occ] = BACKGROUND_COLOR
             img = Image.fromarray(rgb)
         self._draw_debug_crosses(img, cw, ch)
+        self._draw_search(img, cw, ch)
         if (
             self._tkimg is None
             or self._tkimg.width() != cw
@@ -308,6 +381,27 @@ class WorldViewer(tk.Tk):
         if text != self._last_status:
             self._last_status = text
             self.status_var.set(text)
+        self._update_search_status()
+
+    def _update_search_status(self):
+        if not self._search_mode:
+            self.search_status_var.set("")
+            return
+        search_id = self._search_text or "__"
+        text = f"Search id: {search_id}"
+        if self._search_text:
+            bid = int(self._search_text)
+            name = self.blockinfo.get(bid, f"unknown({bid})")
+            text += f"  |  Block: {name}"
+            if len(self._search_positions) == 0:
+                text += "  |  Not found in world"
+            else:
+                target = self._search_target()
+                if target is None:
+                    text += "  |  Move cursor over the world"
+                else:
+                    text += f"  |  Nearest at: ({target[0]}, {target[1]})"
+        self.search_status_var.set(text)
 
     def _entity_sprites(self, cw, ch):
         if not self._entity_draw:

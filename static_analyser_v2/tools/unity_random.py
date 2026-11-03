@@ -1,10 +1,13 @@
 from collections.abc import Iterable
 from functools import reduce
-import struct
+import ctypes
+
+_buf = (ctypes.c_float * 1)()
 
 
 def to_f32(x):
-    return struct.unpack("f", struct.pack("f", x))[0]
+    _buf[0] = x
+    return _buf[0]
 
 
 MASK = 0xFFFFFFFF
