@@ -496,7 +496,7 @@ $RECYCLE.BIN/
 *.tmp
 *temp_*
 nya*
-*.pkl
+**.pkl
 # sorry moffs!
 casproject*
 *CasU-Decompiled*

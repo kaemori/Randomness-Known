@@ -80,8 +80,8 @@ env = Environment(world_state, pl_fn=place_liquids, go_fn=gen_ores)
 
 
 st = time.time()
-# __import__("cProfile").run("exec(gen_terrain, env.as_dict)", "nya.prof")
-exec(gen_terrain, env.as_dict)
+__import__("cProfile").run("exec(gen_terrain, env.as_dict)", "nya.prof")
+# exec(gen_terrain, env.as_dict)
 print(time.time() - st, env.Random._count)
 
 from spectra2 import show_world, WorldFile
