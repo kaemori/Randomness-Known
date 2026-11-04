@@ -2,10 +2,7 @@ from pathlib import Path
 from functools import partial
 import time
 
-from cparser.csfunc import (
-    module_init,
-    getfunc_as_tree,
-)
+from cparser.csfunc import module_init, getfunc_as_tree, getfunc_as_py
 from cparser.transpiler import transpile_method
 from tools.unity_random import UnityRandom
 from tools.unity_shim import Plaything
@@ -21,10 +18,8 @@ DUMP_DIR.mkdir(exist_ok=True)
 _dumped_files = []
 
 
-def load_csfunc(module, func, replacements={}, danger_retasext=False, istfg=True):
-    transpiled = transpile_method(
-        getfunc_as_tree(module, func), danger_return_as_exit=danger_retasext
-    )
+def load_csfunc(module, func, replacements={}, istfg=True):
+    transpiled = getfunc_as_py(module, func)
     for replacement_pair in replacements:
         transpiled = transpiled.replace(*replacement_pair)
     if istfg:
@@ -68,7 +63,6 @@ def gen_terr(env):
                 "UnityEngine.Random.value",
             ),
         ),
-        danger_retasext=True,
     )
     try:
         exec(gen_terrain, env.as_dict)
@@ -100,7 +94,6 @@ def gen_structs(env):
             ("Physics2D.Raycast", "Raycast"),
             (".point", ""),
         ),
-        danger_retasext=True,
     )
     try:
         exec(
@@ -121,7 +114,10 @@ def gen_structs(env):
 
 def gen_ores(env):
     try:
-        exec(load_csfunc(MODULE, "GenerateOres", danger_retasext=True), env.as_dict)
+        exec(
+            load_csfunc(MODULE, "GenerateOres"),
+            env.as_dict,
+        )
     except SystemExit:
         pass
 

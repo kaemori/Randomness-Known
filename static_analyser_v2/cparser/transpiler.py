@@ -340,7 +340,7 @@ ENUM_PREFIXES = {
 }
 
 
-def transpile_method(method_node, danger_return_as_exit=False, as_function=False):
+def transpile_method(method_node, as_function=False):
     """note to self, use getfunc_as_tree"""
     tp = Transpiler()
     name = tp.t(method_node.child_by_field_name("name"))
@@ -360,10 +360,27 @@ def transpile_method(method_node, danger_return_as_exit=False, as_function=False
         mod = ast.fix_missing_locations(ast.Module(body, []))
 
     tx = re.sub(r"<(\S*?)>", r"(\1)", ast.unparse(mod))
-    if danger_return_as_exit:
-        tx = tx.replace("return", "exit()")
+    tx = tx.replace("return", "exit()")
     # for k, v in (PROPERTY_MAP | ENUM_PREFIXES).items():
     #     tx = tx.replace(k, v)
     # tx = tx.replace("UnityEngine.Random", "Random")
 
     return tx
+
+
+def transpile_module(module, skip_unsupported=False):
+    from cparser.csfunc import getmodule_methods_as_tree
+
+    transpiled = {}
+    for method_node in getmodule_methods_as_tree(module):
+        name = method_node.child_by_field_name("name").text.decode("utf-8")
+        try:
+            source = transpile_method(
+                method_node,
+            )
+        except Exception:
+            if not skip_unsupported:
+                raise
+            continue
+        transpiled.setdefault(name, []).append(source)
+    return transpiled
