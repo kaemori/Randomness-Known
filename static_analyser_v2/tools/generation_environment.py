@@ -1,6 +1,8 @@
 import math
 from functools import partial
 
+import numpy as np
+from gpu_fnl import pyglslfnl
 from tools.pyfastnoiselite_binded import FastNoiseLite
 from tools.unity_shim import Mathf, make_unity_engine
 from tools.vectors import Vector2, Vector3
@@ -78,6 +80,8 @@ class Environment:
         "UpdateWorld",
         "PlaceLiquids",
         "WorldToBlockPos",
+        "np",
+        "pyglslfnl",
     )
     __slots__ = _NAMES + ("as_dict",)
 
@@ -132,5 +136,7 @@ class Environment:
         self.PlaceLiquids = partial(pl_fn or PlaceLiquids, self)
 
         self.WorldToBlockPos = WorldToBlockPos
+        self.np = np
+        self.pyglslfnl = pyglslfnl
 
         self.as_dict = {n: getattr(self, n) for n in self._NAMES}

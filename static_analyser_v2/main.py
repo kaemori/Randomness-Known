@@ -11,15 +11,23 @@ from tools.run_settings import RunSettings
 from tools.world_state import WorldState
 from tools import textureloader
 
-from staticfunc.liqfiller import place_liquids, first_solid_below, ensure_groundy
+# from staticfunc.liqfiller import place_liquids, first_solid_below, ensure_groundy
+
+import gc
+
+gc.disable()
 
 DUMP_DIR = Path("temp_gen")
 DUMP_DIR.mkdir(exist_ok=True)
 _dumped_files = []
 
 
-def load_csfunc(module, func, replacements={}, istfg=True):
-    transpiled = getfunc_as_py(module, func)
+def load_csfunc(module, func, replacements={}, istfg=True, use_istfg=False):
+    if use_istfg:
+        path = DUMP_DIR / f"{module}_{func}.py"
+        return path.read_text()
+
+    transpiled = getfunc_as_py(module, func, as_func=True)
     for replacement_pair in replacements:
         transpiled = transpiled.replace(*replacement_pair)
     if istfg:
@@ -46,6 +54,7 @@ world_state = WorldState.create(
     random=unity_random,
 )
 
+# module_init(use_cache=False, write_cache=True)
 module_init()
 MODULE = "WorldGeneration"
 textureloader.copy_icon_images(textureloader.get_blockinfo())
@@ -53,9 +62,10 @@ textureloader.copy_entity_images()
 
 
 def gen_terr(env):
+    func = "WorldGenerateTerrain"
     gen_terrain = load_csfunc(
         MODULE,
-        "WorldGenerateTerrain",
+        func,
         (
             ("int.MaxValue", "0x7FFFFFFF"),
             (
@@ -64,8 +74,11 @@ def gen_terr(env):
             ),
         ),
     )
+    ns = {}
+    exec(gen_terrain, env.as_dict, ns)
     try:
-        exec(gen_terrain, env.as_dict)
+        ns[func]()
+        print(env.Random._count)
     except SystemExit:
         pass
 
@@ -82,7 +95,7 @@ def _raycast(groundy, vector, direction, maxdist, _):
 
 def gen_structs(env):
     # theres a return at "if biomeDepth != 7"??
-    ensure_groundy(env)
+    # ensure_groundy(env)
 
     getsetting = env.WorldGeneration.GetRunSettingFloat
     raycast = partial(_raycast, env.groundy)
@@ -94,7 +107,7 @@ def gen_structs(env):
             ("Physics2D.Raycast", "Raycast"),
             (".point", ""),
         ),
-    )
+    ).replace("return", "exit()")
     try:
         exec(
             gen_struct,
@@ -117,13 +130,14 @@ def gen_ores(env):
         exec(
             load_csfunc(MODULE, "GenerateOres"),
             env.as_dict,
-        )
+        ).replace("return", "exit()")
     except SystemExit:
         pass
 
 
-env = Environment(world_state, pl_fn=place_liquids, wgs_fn=gen_structs, go_fn=gen_ores)
-# env = Environment(world_state, pl_fn=place_liquids, wgs_fn=gen_structs)
+# env = Environment(world_state, pl_fn=place_liquids, wgs_fn=gen_structs, go_fn=gen_ores)
+# env = Environment(world_state, pl_fn=place_liquids, go_fn=gen_ores)
+env = Environment(world_state)
 
 
 st = time.time()
@@ -131,10 +145,13 @@ st = time.time()
 gen_terr(env)
 print(time.time() - st, env.Random._count)
 
-from spectra2 import show_world, WorldFile
+# from spectra2 import show_world, WorldFile
+
+# show_world(world_state, textureloader.get_blockinfo())
+
 
 # WorldFile(
 #     world_state.world_blocks, world_state.fluid, textureloader.get_blockinfo()
 # ).save()
 
-show_world(world_state, textureloader.get_blockinfo())
+# show_world(world_state, textureloader.get_blockinfo())

@@ -69,7 +69,7 @@ class UnityRandom:
         return to_f32((self._next() & 0x7FFFFF) / 0x7FFFFF)
 
     def Range(self, a, b):
-        if isinstance(a, int) and b.is_integer():
+        if isinstance(a, int) and isinstance(b, int):
             return self.range_int(a, b)
         return self.range_float(a, b)
 
@@ -77,6 +77,7 @@ class UnityRandom:
         return min_val + self.value * (max_val - min_val)
 
     def range_int(self, min_inclusive, max_exclusive):
+        # print("rangeint called")
         span = max_exclusive - min_inclusive
         if span == 0:
             self._next()
@@ -101,3 +102,12 @@ def splitmix64(seed: int):
         z = next_val(z)
         vals.append(z & 0xFFFFFFFF)
     return vals
+
+
+import time
+
+st = time.perf_counter()
+rand = UnityRandom.splitmixed("nyannyannyan")
+for i in range(313514):
+    rand.Range(0, 1)
+print((time.perf_counter() - st) * 1000)

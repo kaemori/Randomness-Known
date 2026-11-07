@@ -333,11 +333,181 @@ PROPERTY_MAP = {
     "SetFractalWeightedStrength": "fractal_weighted_strength",
 }
 ENUM_PREFIXES = {
-    "FastNoiseLite.NoiseType.": "NoiseType.NoiseType_",
-    "FastNoiseLite.FractalType.": "FractalType.FractalType_",
-    "FastNoiseLite.CellularDistanceFunction.": "CellularDistanceFunction.CellularDistanceFunction_",
-    "FastNoiseLite.CellularReturnType.": "CellularReturnType.CellularReturnType_",
+    "FastNoiseLite.NoiseType.": "",
+    "FastNoiseLite.FractalType.": "",
+    "FastNoiseLite.CellularDistanceFunction.": "",
+    "FastNoiseLite.CellularReturnType.": "",
 }
+
+
+def _fnl_to_gpu(pyfn):
+    def branch_key(index, constructor_indent):
+        for line_index in range(index - 1, -1, -1):
+            line = lines[line_index]
+            stripped = line.lstrip()
+            indent = len(line) - len(stripped)
+            if indent < constructor_indent and stripped.startswith(
+                ("if ", "elif ", "else:")
+            ):
+                return line_index
+        return None
+
+    gpu_properties = {
+        "SetNoiseType": "type",
+        "SetFractalType": "fractal",
+        "SetFrequency": "freq",
+        "SetFractalOctaves": "octaves",
+        "SetFractalLacunarity": "lacunarity",
+        "SetFractalGain": "gain",
+        "SetFractalWeightedStrength": "weighted",
+        "SetCellularJitter": "jitter",
+    }
+    enum_names = {
+        "NoiseType": {
+            "OpenSimplex2": "OPENSIMPLEX2",
+            "Perlin": "PERLIN",
+            "Value": "VALUE",
+            "Cellular": "CELLULAR",
+        },
+        "FractalType": {
+            "None": "NONE",
+            "FBm": "FBM",
+            "Ridged": "RIDGED",
+            "PingPong": "PINGPONG",
+        },
+    }
+
+    lines = pyfn.splitlines()
+    constructors = []
+    for index, line in enumerate(lines):
+        match = re.match(r"^(\s*)(\w+)\s*=\s*FastNoiseLite\((.*)\)\s*$", line)
+        if match:
+            indent, var, seed = match.groups()
+            constructors.append(
+                {
+                    "index": index,
+                    "indent": len(indent),
+                    "var": var,
+                    "seed": seed,
+                    "branch": None,
+                    "setters": [],
+                }
+            )
+
+    if not constructors:
+        return pyfn
+
+    for constructor in constructors:
+        constructor["branch"] = branch_key(constructor["index"], constructor["indent"])
+
+    for index, line in enumerate(lines):
+        match = re.match(r"^(\s*)(\w+)\.(Set\w+)\((.*)\)\s*$", line)
+        if not match:
+            continue
+        _, var, setter, value = match.groups()
+        candidates = [
+            constructor
+            for constructor in constructors
+            if constructor["var"] == var
+            and constructor["index"] < index
+            and constructor["branch"] == branch_key(index, constructor["indent"])
+        ]
+        if candidates:
+            candidates[-1]["setters"].append(
+                (index, len(match.group(1)), setter, value)
+            )
+
+    def enum_value(value):
+        match = re.fullmatch(
+            r"FastNoiseLite\.(NoiseType|FractalType)\.(\w+)", value.strip()
+        )
+        if match:
+            name = enum_names[match.group(1)].get(match.group(2), value)
+            return f"pyglslfnl.{name}"
+        return value
+
+    def enclosing_loop(index, indent):
+        candidate = None
+        for loop_index in range(index - 1, -1, -1):
+            stripped = lines[loop_index].lstrip()
+            if len(lines[loop_index]) - len(stripped) < indent and stripped.startswith(
+                ("while ", "for ")
+            ):
+                if (
+                    candidate is None
+                    or len(lines[loop_index]) - len(stripped) < candidate[0]
+                ):
+                    candidate = (len(lines[loop_index]) - len(stripped), loop_index)
+        return candidate[1] if candidate is not None else None
+
+    replacements = {}
+    insertions = {}
+    removed = set()
+    for constructor in constructors:
+        var = constructor["var"]
+        constructor_index = constructor["index"]
+        constructor_indent = constructor["indent"]
+        seed = constructor["seed"]
+        replacements[constructor_index] = (
+            f"{' ' * constructor_indent}{var}_seed = {seed}"
+        )
+        config = []
+        dynamic_setter = None
+        for index, indent, setter, value in constructor["setters"]:
+            removed.add(index)
+            property_name = gpu_properties.get(setter)
+            if property_name is None:
+                continue
+            value = enum_value(value)
+            config.append((property_name, value))
+            if setter == "SetFrequency" and enclosing_loop(index, indent) is not None:
+                dynamic_setter = (index, indent, value)
+
+        if not config:
+            continue
+        kwargs = []
+        for property_name, value in config:
+            if property_name == "freq" and dynamic_setter is not None:
+                continue
+            kwargs.append(f"{property_name}={value}")
+
+        if dynamic_setter is None:
+            target = constructor["setters"][-1][0] + 1
+            frequency = next((value for name, value in config if name == "freq"), None)
+        else:
+            _, dynamic_indent, frequency = dynamic_setter
+            target = enclosing_loop(dynamic_setter[0], dynamic_indent)
+            if target is None:
+                target = dynamic_setter[0] + 1
+            if "GetNoise" in frequency:
+                frequency = re.sub(r"(\w+)\.GetNoise\(\w+,\s*\w+\)", r"\1", frequency)
+            else:
+                loop_variable = re.search(r"\b(\w+)\s*/\s*height", frequency)
+                if loop_variable:
+                    frequency = frequency.replace(
+                        loop_variable.group(1),
+                        "np.broadcast_to(np.arange(height)[None, :], (width, height))",
+                    )
+            kwargs.append(f"freq={frequency}")
+
+        call = f"pyglslfnl.noise(width, height, {var}_seed"
+        if kwargs:
+            call += ", " + ", ".join(kwargs)
+        call += ")"
+        indent = len(lines[target]) - len(lines[target].lstrip())
+        insertions.setdefault(target, []).append(f"{' ' * indent}{var} = {call}")
+
+    output = []
+    for index, line in enumerate(lines):
+        if index in insertions:
+            output.extend(insertions[index])
+        if index in removed:
+            continue
+        line = replacements.get(index, line)
+        line = re.sub(r"(\w+)\.GetNoise\(([^,]+),\s*([^\)]+)\)", r"\1[\2, \3]", line)
+        output.append(line)
+
+    return "\n".join(output)
 
 
 def transpile_method(method_node, as_function=False):
@@ -360,24 +530,24 @@ def transpile_method(method_node, as_function=False):
         mod = ast.fix_missing_locations(ast.Module(body, []))
 
     tx = re.sub(r"<(\S*?)>", r"(\1)", ast.unparse(mod))
-    tx = tx.replace("return", "exit()")
     # for k, v in (PROPERTY_MAP | ENUM_PREFIXES).items():
     #     tx = tx.replace(k, v)
     # tx = tx.replace("UnityEngine.Random", "Random")
+    tx = tx.replace("return", "exit()")
+    tx = _fnl_to_gpu(tx)
+    tx = re.sub(r"^\s*None\s*$", "", tx, flags=re.MULTILINE)
 
-    return tx
+    return "\n".join([line for line in tx.splitlines() if "tileCounter" not in line])
 
 
-def transpile_module(module, skip_unsupported=False):
+def transpile_module(module, skip_unsupported=False, as_function=True):
     from cparser.csfunc import getmodule_methods_as_tree
 
     transpiled = {}
     for method_node in getmodule_methods_as_tree(module):
         name = method_node.child_by_field_name("name").text.decode("utf-8")
         try:
-            source = transpile_method(
-                method_node,
-            )
+            source = transpile_method(method_node, as_function=as_function)
         except Exception:
             if not skip_unsupported:
                 raise
