@@ -5,6 +5,7 @@ import numpy as np
 from gpu_fnl import pyglslfnl
 from tools.pyfastnoiselite_binded import FastNoiseLite
 from tools.unity_shim import Mathf, make_unity_engine
+from tools.unity_random import xs_value, xs_range_ambig, xs_range_float, xs_range_int
 from tools.vectors import Vector2, Vector3
 
 
@@ -55,7 +56,11 @@ class Environment:
         "height",
         "chunkWidth",
         "chunkHeight",
-        "Random",
+        "xs_state",
+        "xs_value",
+        "xs_range_ambig",
+        "xs_range_float",
+        "xs_range_int",
         "WorldGeneration",
         "halfWidth",
         "halfHeight",
@@ -108,13 +113,19 @@ class Environment:
         self.height = ws.height
         self.chunkWidth = ws.chunk_width
         self.chunkHeight = ws.chunk_height
-        self.Random = ws.random
         self.WorldGeneration = ws.run_settings
         self.halfWidth = ws.half_width
         self.halfHeight = ws.half_height
         self.worldBlocks = ws.world_blocks
         self.fluid = ws.fluid
-        self.UnityEngine = make_unity_engine(ws.random)
+
+        self.xs_state = ws.random_state
+        self.xs_value = xs_value
+        self.xs_range_ambig = xs_range_ambig
+        self.xs_range_float = xs_range_float
+        self.xs_range_int = xs_range_int
+
+        self.UnityEngine = make_unity_engine()
         self.math = math
         self.Mathf = Mathf
         self.FastNoiseLite = FastNoiseLite

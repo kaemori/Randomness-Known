@@ -41,15 +41,14 @@ class Object:
 
 
 class UnityEngine:
-    __slots__ = ("Random", "Mathf", "Object", "Vector2", "Vector3")
+    __slots__ = ("Mathf", "Object", "Vector2", "Vector3")
 
-    def __init__(self, random):
-        self.Random = random
+    def __init__(self):
         self.Mathf = Mathf
         self.Object = Object
         self.Vector2 = Vector2
         self.Vector3 = Vector3
 
 
-def make_unity_engine(random):
-    return UnityEngine(random)
+def make_unity_engine():
+    return UnityEngine()

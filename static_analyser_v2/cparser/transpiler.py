@@ -320,6 +320,106 @@ class Transpiler:
         return self.s_expression_statement(Fake)
 
 
+class StaticRandomReplacer(ast.NodeTransformer):
+    def visit_Call(self, node):
+        self.generic_visit(node)
+
+        if not self._is_target_call(node.func):
+            return node
+
+        if node.func.attr == "Range":
+            if len(node.args) != 2:
+                raise ValueError(
+                    f"{node.args} ({len(node.args)} args) on a UnityEngine.Random.Range?"
+                )
+
+            lo, hi = node.args
+            lo_type, hi_type = self._target_type(lo), self._target_type(hi)
+
+            if lo_type is None or hi_type is None:
+                usefunc_name = "xs_range_ambig"
+            elif lo_type is float or hi_type is float:
+                usefunc_name = "xs_range_float"
+            elif lo_type is int and hi_type is int:
+                usefunc_name = "xs_range_int"
+            else:
+                raise Exception("i dont even know what the fuck happened?")
+
+        elif node.func.attr == "value":
+            usefunc_name = "xs_value"
+
+        else:
+            return node
+
+        return ast.copy_location(
+            ast.NamedExpr(
+                ast.Name("xs_state"),
+                ast.Call(
+                    func=ast.Name(id=usefunc_name, ctx=ast.Load()),
+                    args=(
+                        [ast.Name("xs_state")]
+                        if node.func.attr == "value"
+                        else [ast.Name("xs_state"), lo, hi]
+                    ),
+                    keywords=node.keywords,
+                ),
+            ),
+            node,
+        )
+
+    def visit_Attribute(self, node):
+        self.generic_visit(node)
+
+        if self._is_target_call(node) and node.attr == "value":
+            return ast.copy_location(
+                ast.NamedExpr(
+                    ast.Name("xs_state"),
+                    ast.Call(
+                        func=ast.Name(id="xs_value", ctx=ast.Load()),
+                        args=[ast.Name("xs_state")],
+                        keywords=[],
+                    ),
+                ),
+                node,
+            )
+
+        if (
+            isinstance(node.value, ast.Name)
+            and node.value.id == "int"
+            and node.attr == "MaxValue"
+        ):
+            return ast.copy_location(ast.Constant(value=0x7FFFFFFF), node)
+        return node
+
+    def _target_type(self, node):
+        if isinstance(node, ast.Constant):
+            if isinstance(node.value, int):
+                return int
+            elif isinstance(node.value, float):
+                return float
+        elif isinstance(node, ast.UnaryOp) and isinstance(
+            node.op, (ast.USub, ast.UAdd)
+        ):
+            return self._target_type(node.operand)
+        elif isinstance(node, ast.Call):
+            if isinstance(node.func, ast.Name):
+                if node.func.id == "int":
+                    return int
+                elif node.func.id == "float":
+                    return float
+        return None
+
+    @staticmethod
+    def _is_target_call(func_node):
+        return (
+            isinstance(func_node, ast.Attribute)
+            and isinstance(func_node.value, ast.Attribute)
+            and func_node.value.attr == "Random"
+            and isinstance(func_node.value.value, ast.Name)
+            and func_node.value.value.id == "UnityEngine"
+        )
+
+
 PROPERTY_MAP = {
     "SetNoiseType": "noise_type",
     "SetFractalType": "fractal_type",
@@ -525,9 +625,14 @@ def transpile_method(method_node, as_function=False):
         fn = ast.FunctionDef(
             name, ast.arguments([], params, None, [], [], None, []), body, [], None
         )
-        mod = ast.fix_missing_locations(ast.Module([fn], []))
+        mod = ast.Module([fn], [])
+        # mod = ast.fix_missing_locations(ast.Module([fn], []))
     else:
-        mod = ast.fix_missing_locations(ast.Module(body, []))
+        mod = ast.Module(body, [])
+        # mod = ast.fix_missing_locations(ast.Module(body, []))
+
+    mod = StaticRandomReplacer().visit(mod)
+    ast.fix_missing_locations(mod)
 
     tx = re.sub(r"<(\S*?)>", r"(\1)", ast.unparse(mod))
     # for k, v in (PROPERTY_MAP | ENUM_PREFIXES).items():

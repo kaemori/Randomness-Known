@@ -70,7 +70,7 @@ def _extract_methods(modbytes, root):
 
 
 @showtime
-def module_init(decom_path=None, cache_path=None, use_cache=True, write_cache=None):
+def module_init(decom_path=None, cache_path=None, use_cache=True, write_cache=False):
     global _lang, _parser, _modules, _module_index, _module_python
     global _module_python_body
     global _module_trees, _decompiled_path, _hasinit

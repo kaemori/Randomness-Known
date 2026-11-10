@@ -4,6 +4,7 @@ import math
 import numpy as np
 
 from tools.unity_shim import Plaything
+from tools.unity_random import xs_value, xs_range_ambig, xs_range_float, xs_range_int
 
 
 @dataclass(slots=True)
@@ -14,7 +15,7 @@ class WorldState:
     chunk_width: int
     chunk_height: int
     run_settings: object
-    random: object
+    random_state: list
     world_blocks: np.ndarray
     fluid: np.ndarray
     biome_override: float
@@ -22,9 +23,9 @@ class WorldState:
 
     def __post_init__(self):
         if self.biome_depth == 0:
-            _rd = self.random
+            _rd = self.random_state
             for _ in range(412):
-                _rd.value
+                xs_value(_rd)
 
     @classmethod
     def create(
@@ -36,7 +37,7 @@ class WorldState:
         chunk_width,
         chunk_height,
         run_settings,
-        random
+        random_state
     ):
         return cls(
             biome_depth=biome_depth,
@@ -45,7 +46,7 @@ class WorldState:
             chunk_width=chunk_width,
             chunk_height=chunk_height,
             run_settings=run_settings,
-            random=random,
+            random_state=random_state,
             world_blocks=np.zeros((width, height), dtype=np.uint16),
             fluid=np.zeros((width, height), dtype=np.uint8),
             # biome_override=float("nan"),

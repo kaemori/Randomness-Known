@@ -1,88 +1,47 @@
-from collections.abc import Iterable
 from functools import reduce
-import ctypes
-
-_buf = (ctypes.c_float * 1)()
-
-
-def to_f32(x):
-    _buf[0] = x
-    return _buf[0]
+import numba as nb
+import numpy as np
 
 
-MASK = 0xFFFFFFFF
+@nb.njit(cache=True, inline="always")
+def xs_next(state):
+    s0, s1, s2, s3 = state
+    t = s0
+    t = (t ^ (t << 11)) & 0xFFFFFFFF
+    t = (t ^ (t >> 8)) & 0xFFFFFFFF
+    t = (t ^ s3 ^ (s3 >> 19)) & 0xFFFFFFFF
+    return (s1, s2, s3, t), t
 
 
-class UnityRandom:
-    def __init__(self, s0_or_iter, s1=None, s2=None, s3=None):
-        self._count = 0
-        if isinstance(s0_or_iter, Iterable):
-            self.s0, self.s1, self.s2, self.s3 = s0_or_iter
-        else:
-            self.s0 = s0_or_iter & MASK
-            self.s1 = s1 & MASK
-            self.s2 = s2 & MASK
-            self.s3 = s3 & MASK
+@nb.njit(cache=True, inline="always")
+def xs_value(state):
+    state, t = xs_next(state)
+    return state, np.float32((t & 0x7FFFFF) / 0x7FFFFF)
 
-    @classmethod
-    def splitmixed(cls, seedstring):
-        return cls(splitmix64(seedstring))
 
-    @staticmethod
-    def xorshift128(s0, s1, s2, s3):
-        t = s0
-        t = (t ^ (t << 11)) & MASK
-        t = (t ^ (t >> 8)) & MASK
-        t = (t ^ s3 ^ (s3 >> 19)) & MASK
-        return s1, s2, s3, t
+@nb.njit(cache=True, inline="always")
+def xs_range_ambig(state, lo, hi):
+    lo, hi = min(lo, hi), max(lo, hi)
+    if isinstance(lo, int) and isinstance(hi, int):
+        return xs_range_int(state, lo, hi)
+    return xs_range_float(state, lo, hi)
 
-    def _next(self):
-        self._count += 1
-        t = self.s0
-        t = (t ^ (t << 11)) & MASK
-        t = (t ^ (t >> 8)) & MASK
-        t = (t ^ self.s3 ^ (self.s3 >> 19)) & MASK
-        self.s0, self.s1, self.s2, self.s3 = self.s1, self.s2, self.s3, t
-        return t
 
-    @property
-    def _state(self):
-        return (self.s0, self.s1, self.s2, self.s3)
+@nb.njit(cache=True, inline="always")
+def xs_range_float(state, lo, hi):
+    lo, hi = min(lo, hi), max(lo, hi)
+    state, v = xs_value(state)
+    return state, lo + v * (hi - lo)
 
-    @property
-    def _state_unitylike(self):
-        return {f"s{i}": st for i, st in zip(range(4), self._state)}
 
-    # larping
-    def _peek(self):
-        t = self.s0
-        t = (t ^ (t << 11)) & MASK
-        t = (t ^ (t >> 8)) & MASK
-        t = (t ^ self.s3 ^ (self.s3 >> 19)) & MASK
-        return to_f32((t & 0x7FFFFF) / 0x7FFFFF)
-
-    # def value(self):
-    #     return to_f32((self._next() & 0x7FFFFF) / 0x7FFFFF)
-
-    @property
-    def value(self):
-        return to_f32((self._next() & 0x7FFFFF) / 0x7FFFFF)
-
-    def Range(self, a, b):
-        if isinstance(a, int) and isinstance(b, int):
-            return self.range_int(a, b)
-        return self.range_float(a, b)
-
-    def range_float(self, min_val, max_val):
-        return min_val + self.value * (max_val - min_val)
-
-    def range_int(self, min_inclusive, max_exclusive):
-        # print("rangeint called")
-        span = max_exclusive - min_inclusive
-        if span == 0:
-            self._next()
-            return min_inclusive
-        return min_inclusive + int(self.value * span)
+@nb.njit(cache=True, inline="always")
+def xs_range_int(state, lo, hi):
+    lo, hi = min(lo, hi), max(lo, hi)
+    state, v = xs_value(state)
+    span = hi - lo
+    if span == 0:
+        return state, lo
+    return state, lo + int(v * span)
 
 
 def splitmix64(seed: int):
@@ -102,12 +61,3 @@ def splitmix64(seed: int):
         z = next_val(z)
         vals.append(z & 0xFFFFFFFF)
     return vals
-
-
-import time
-
-st = time.perf_counter()
-rand = UnityRandom.splitmixed("nyannyannyan")
-for i in range(313514):
-    rand.Range(0, 1)
-print((time.perf_counter() - st) * 1000)
