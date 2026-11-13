@@ -56,6 +56,9 @@ class Transpiler:
     def e_identifier(self, n):
         return ast.Name(self.t(n), ast.Load())
 
+    def e_this_expression(self, n):
+        return ast.Name("self", ast.Load())
+
     def e_boolean_literal(self, n):
         return ast.Constant(self.t(n) == "true")
 
@@ -76,11 +79,24 @@ class Transpiler:
         return self.expr(n.named_children[0])
 
     def e_member_access_expression(self, n):
-        return ast.Attribute(
+        name_node = n.child_by_field_name("name")
+        targs, base = self.split_generic(name_node)
+        attr = ast.Attribute(
             self.expr(n.child_by_field_name("expression")),
-            self.t(n.child_by_field_name("name")),
+            base if base else self.t(name_node),
             ast.Load(),
         )
+        if targs:
+            attr._generic_args = [self.expr(t) for t in targs]
+        return attr
+
+    def e_checked_expression(self, n):
+        return self.expr(n.named_children[0])
+
+    e_unchecked_expression = e_checked_expression
+
+    def e_typeof_expression(self, n):
+        return ast.Name(self.t(n.named_children[0]), ast.Load())
 
     def e_predefined_type(self, n):
         return ast.Name(self.t(n), ast.Load())
@@ -89,19 +105,49 @@ class Transpiler:
         return [self.expr(a.named_children[-1]) for a in n.named_children]
 
     def e_invocation_expression(self, n):
+        func_node = n.child_by_field_name("function")
+        targs, base = self.split_generic(func_node)
+        if targs:
+            func = ast.Name(base, ast.Load())
+            generic_args = [self.expr(t) for t in targs]
+        else:
+            func = self.expr(func_node)
+            generic_args = getattr(func, "_generic_args", None) or []
         return ast.Call(
-            self.expr(n.child_by_field_name("function")),
-            self.args(n.child_by_field_name("arguments")),
-            [],
+            func, generic_args + self.args(n.child_by_field_name("arguments")), []
         )
 
     def e_object_creation_expression(self, n):
+        type_node = n.child_by_field_name("type")
+        _, base = self.split_generic(type_node)
         a = n.child_by_field_name("arguments")
-        return ast.Call(
-            ast.Name(self.t(n.child_by_field_name("type")), ast.Load()),
-            self.args(a) if a else [],
-            [],
+        args = self.args(a) if a else []
+        name = base if base else self.t(type_node)
+        return ast.Call(ast.Name(name, ast.Load()), args, [])
+
+    def e_initializer_expression(self, n):
+        return ast.List([self.expr(child) for child in n.named_children], ast.Load())
+
+    def e_array_creation_expression(self, n):
+        initializer = next(
+            (
+                child
+                for child in n.named_children
+                if child.type == "initializer_expression"
+            ),
+            None,
         )
+        return self.expr(initializer) if initializer else ast.List([], ast.Load())
+
+    def e_declaration_expression(self, n):
+        first = n.named_children[0]
+        if first.type == "pointer_type" and len(n.named_children) == 2:
+            return ast.BinOp(
+                self.expr(first.named_children[0]),
+                ast.Mult(),
+                self.expr(n.named_children[1]),
+            )
+        return self.expr(n.named_children[-1])
 
     def e_element_access_expression(self, n):
         idx = self.args(n.child_by_field_name("subscript"))
@@ -109,6 +155,10 @@ class Transpiler:
         return ast.Subscript(
             self.expr(n.child_by_field_name("expression")), sl, ast.Load()
         )
+
+    def e_generic_name(self, n):
+        _, base = self.split_generic(n)
+        return ast.Name(base, ast.Load())
 
     def e_conditional_expression(self, n):
         g = n.child_by_field_name
@@ -148,6 +198,8 @@ class Transpiler:
             return ast.BoolOp(BOOLOPS[op](), [l, r])
         if op in CMPOPS:
             return ast.Compare(l, [CMPOPS[op]()], [r])
+        if op == "??":
+            return ast.IfExp(ast.Compare(l, [ast.IsNot()], [ast.Constant(None)]), l, r)
         if op == "/" and self.is_int(g("left")) and self.is_int(g("right")):
             return ast.Call(
                 ast.Name("int", ast.Load()), [ast.BinOp(l, ast.Div(), r)], []
@@ -307,6 +359,13 @@ class Transpiler:
                 result.append(s)
         return result
 
+    def split_generic(self, n):
+        if n is None or n.type != "generic_name":
+            return [], None
+        ident = next(c for c in n.named_children if c.type == "identifier")
+        targlist = next(c for c in n.named_children if c.type == "type_argument_list")
+        return list(targlist.named_children), self.t(ident)
+
     def stmt_from_decl(self, init):
         class Fake:
             named_children = [init]
@@ -320,7 +379,104 @@ class Transpiler:
         return self.s_expression_statement(Fake)
 
 
+class ListMethodReplacer(ast.NodeTransformer):
+    def visit_Call(self, node):
+        self.generic_visit(node)
+
+        if isinstance(node.func, ast.Name) and node.func.id == "List":
+            if not node.args:
+                return ast.copy_location(ast.List([], ctx=ast.Load()), node)
+            new_call = ast.Call(
+                func=ast.Name("list", ctx=ast.Load()),
+                args=node.args,
+                keywords=node.keywords,
+            )
+            return ast.copy_location(new_call, node)
+
+        if not isinstance(node.func, ast.Attribute):
+            return node
+
+        if node.func.attr == "Add":
+            node.func.attr = "append"
+            return node
+
+        if node.func.attr == "Remove":
+            node.func.attr = "remove"
+            return node
+
+        if node.func.attr == "Contains":
+            (y,) = node.args if node.args else (ast.Constant(None),)
+            cmp = ast.Compare(
+                left=y,
+                ops=[ast.In()],
+                comparators=[node.func.value],
+            )
+            return ast.copy_location(cmp, node)
+
+        if node.func.attr == "PickRandom":
+            new_call = ast.Call(
+                # func=ast.Attribute(
+                #     value=ast.Name("random", ctx=ast.Load()),
+                #     attr="choice",
+                #     ctx=ast.Load(),
+                # ),
+                func=ast.Name("random_choice", ctx=ast.Load()),
+                args=[node.func.value, *node.args],
+                keywords=node.keywords,
+            )
+            return ast.copy_location(new_call, node)
+
+        return node
+
+    def visit_Attribute(self, node):
+        self.generic_visit(node)
+
+        if node.attr == "Count":
+            new_call = ast.Call(
+                func=ast.Name("len", ctx=ast.Load()),
+                args=[node.value],
+                keywords=[],
+            )
+            return ast.copy_location(new_call, node)
+
+        return node
+
+
 class StaticRandomReplacer(ast.NodeTransformer):
+    def __init__(self):
+        super().__init__()
+        self._tmp_counter = 0
+
+    def _fresh_tmp(self):
+        self._tmp_counter += 1
+        return f"_xs_tmp{self._tmp_counter}"
+
+    def _build_rng_expr(self, usefunc_name, call_args, keywords, anchor):
+        tmp_name = self._fresh_tmp()
+
+        call = ast.Call(
+            func=ast.Name(id=usefunc_name, ctx=ast.Load()),
+            args=call_args,
+            keywords=keywords,
+        )
+        tmp_assign = ast.NamedExpr(ast.Name(tmp_name, ctx=ast.Store()), call)
+        state_assign = ast.NamedExpr(
+            ast.Name("xs_state", ctx=ast.Store()),
+            ast.Subscript(
+                value=ast.Name(tmp_name, ctx=ast.Load()),
+                slice=ast.Constant(value=0),
+                ctx=ast.Load(),
+            ),
+        )
+        value_expr = ast.Subscript(
+            value=ast.Name(tmp_name, ctx=ast.Load()),
+            slice=ast.Constant(value=1),
+            ctx=ast.Load(),
+        )
+        tup = ast.Tuple(elts=[tmp_assign, state_assign, value_expr], ctx=ast.Load())
+        result = ast.Subscript(value=tup, slice=ast.Constant(value=2), ctx=ast.Load())
+        return ast.copy_location(result, anchor)
+
     def visit_Call(self, node):
         self.generic_visit(node)
 
@@ -345,41 +501,37 @@ class StaticRandomReplacer(ast.NodeTransformer):
             else:
                 raise Exception("i dont even know what the fuck happened?")
 
+            call_args = [ast.Name("xs_state", ctx=ast.Load()), lo, hi]
+
         elif node.func.attr == "value":
             usefunc_name = "xs_value"
+            call_args = [ast.Name("xs_state", ctx=ast.Load())]
 
         else:
             return node
 
-        return ast.copy_location(
-            ast.NamedExpr(
-                ast.Name("xs_state"),
-                ast.Call(
-                    func=ast.Name(id=usefunc_name, ctx=ast.Load()),
-                    args=(
-                        [ast.Name("xs_state")]
-                        if node.func.attr == "value"
-                        else [ast.Name("xs_state"), lo, hi]
-                    ),
-                    keywords=node.keywords,
-                ),
-            ),
-            node,
-        )
+        return self._build_rng_expr(usefunc_name, call_args, node.keywords, node)
 
     def visit_Attribute(self, node):
         self.generic_visit(node)
 
         if self._is_target_call(node) and node.attr == "value":
+            return self._build_rng_expr(
+                "xs_value",
+                [ast.Name("xs_state", ctx=ast.Load())],
+                [],
+                node,
+            )
+
+        if self._is_target_call(node) and node.attr == "insideUnitCircle":
+            x = self._build_rng_expr(
+                "xs_value", [ast.Name("xs_state", ctx=ast.Load())], [], node
+            )
+            y = self._build_rng_expr(
+                "xs_value", [ast.Name("xs_state", ctx=ast.Load())], [], node
+            )
             return ast.copy_location(
-                ast.NamedExpr(
-                    ast.Name("xs_state"),
-                    ast.Call(
-                        func=ast.Name(id="xs_value", ctx=ast.Load()),
-                        args=[ast.Name("xs_state")],
-                        keywords=[],
-                    ),
-                ),
+                ast.Call(ast.Name("Vector2", ctx=ast.Load()), [x, y], []),
                 node,
             )
 
@@ -389,6 +541,16 @@ class StaticRandomReplacer(ast.NodeTransformer):
             and node.attr == "MaxValue"
         ):
             return ast.copy_location(ast.Constant(value=0x7FFFFFFF), node)
+        return node
+
+    def visit_FunctionDef(self, node):
+        self.generic_visit(node)
+        node.body.insert(0, ast.copy_location(ast.Global(names=["xs_state"]), node))
+        return node
+
+    def visit_AsyncFunctionDef(self, node):
+        self.generic_visit(node)
+        node.body.insert(0, ast.copy_location(ast.Global(names=["xs_state"]), node))
         return node
 
     def _target_type(self, node):
@@ -418,6 +580,84 @@ class StaticRandomReplacer(ast.NodeTransformer):
             and isinstance(func_node.value.value, ast.Name)
             and func_node.value.value.id == "UnityEngine"
         )
+
+
+class InstantiateReplacer(ast.NodeTransformer):
+    @staticmethod
+    def _is_utils_create(node):
+        return (
+            isinstance(node, ast.Attribute)
+            and node.attr == "Create"
+            and isinstance(node.value, ast.Name)
+            and node.value.id == "Utils"
+        )
+
+    @staticmethod
+    def _is_unity_object_instantiate(node):
+        return (
+            isinstance(node, ast.Attribute)
+            and node.attr == "Instantiate"
+            and isinstance(node.value, ast.Attribute)
+            and node.value.attr == "Object"
+            and isinstance(node.value.value, ast.Name)
+            and node.value.value.id == "UnityEngine"
+        )
+
+    @staticmethod
+    def _is_quaternion_euler(node):
+        return (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "Euler"
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "Quaternion"
+            and len(node.args) == 3
+        )
+
+    @staticmethod
+    def _is_resources_load(node):
+        return (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "Load"
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "Resources"
+            and node.args
+        )
+
+    def visit_Call(self, node):
+        self.generic_visit(node)
+
+        if self._is_unity_object_instantiate(node.func) and node.args:
+            first, *rest = node.args
+            if self._is_resources_load(first):
+                rest = [
+                    arg.args[2] if self._is_quaternion_euler(arg) else arg
+                    for arg in rest
+                ]
+                new_call = ast.Call(
+                    # func=ast.Attribute(
+                    #     value=ast.Name("Utils", ctx=ast.Load()),
+                    #     attr="Create",
+                    #     ctx=ast.Load(),
+                    # ),
+                    ast.Name("utils_create", ctx=ast.Load()),
+                    args=[first.args[0], *rest],
+                    keywords=node.keywords,
+                )
+                return ast.copy_location(new_call, node)
+
+        if self._is_utils_create(node.func) and node.args:
+            return ast.copy_location(
+                ast.Call(
+                    ast.Name("utils_create", ctx=ast.Load()),
+                    args=node.args,
+                    keywords=node.keywords,
+                ),
+                node,
+            )
+
+        return node
 
 
 PROPERTY_MAP = {
@@ -465,6 +705,7 @@ def _fnl_to_gpu(pyfn):
     enum_names = {
         "NoiseType": {
             "OpenSimplex2": "OPENSIMPLEX2",
+            "OpenSimplex2S": "OPENSIMPLEX2S",
             "Perlin": "PERLIN",
             "Value": "VALUE",
             "Cellular": "CELLULAR",
@@ -632,9 +873,14 @@ def transpile_method(method_node, as_function=False):
         # mod = ast.fix_missing_locations(ast.Module(body, []))
 
     mod = StaticRandomReplacer().visit(mod)
+    mod = ListMethodReplacer().visit(mod)
+    mod = InstantiateReplacer().visit(mod)
+
     ast.fix_missing_locations(mod)
 
-    tx = re.sub(r"<(\S*?)>", r"(\1)", ast.unparse(mod))
+    tx = ast.unparse(mod)
+
+    # tx = re.sub(r"<(\S*?)>", r"(\1)", ast.unparse(mod))
     # for k, v in (PROPERTY_MAP | ENUM_PREFIXES).items():
     #     tx = tx.replace(k, v)
     # tx = tx.replace("UnityEngine.Random", "Random")

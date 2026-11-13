@@ -19,6 +19,12 @@ class PlaythingRetSelf:
     __iter__ = __setattr__ = __getattr__ = __getitem__ = __setitem__ = __call__ = _mock
 
 
+class Math:
+    @staticmethod
+    def Abs(x):
+        return abs(x)
+
+
 class Mathf:
     @staticmethod
     def RoundToInt(x):
@@ -31,6 +37,10 @@ class Mathf:
     @staticmethod
     def Lerp(a, b, t):
         return a + (b - a) * t
+
+    @staticmethod
+    def Abs(a):
+        return abs(a)
 
 
 class Object:

@@ -54,6 +54,65 @@ float simplex(int s, float x, float y) {
     return (n0 + n1 + n2) * 99.83685446303647;
 }
 
+float simplex2s(int s, float x, float y) {
+    int i = int(floor(x)), j = int(floor(y));
+    float xi = x - float(i), yi = y - float(j);
+    float t = (xi + yi) * G2, x0 = xi - t, y0 = yi - t;
+    i *= PX; j *= PY;
+    int i1 = i + PX, j1 = j + PY;
+
+    const float TW = 2.0 / 3.0;
+    float a0 = TW - x0*x0 - y0*y0;
+    float value = a0*a0*a0*a0 * gradCoord(s, i, j, x0, y0);
+
+    float a1 = 2.0*(1.0-2.0*G2)*(1.0/G2-2.0)*t + (-2.0*(1.0-2.0*G2)*(1.0-2.0*G2) + a0);
+    float x1 = x0 - (1.0 - 2.0*G2), y1 = y0 - (1.0 - 2.0*G2);
+    value += a1*a1*a1*a1 * gradCoord(s, i1, j1, x1, y1);
+
+    float xmyi = xi - yi;
+    float x2, y2, a2;
+    if (t > G2) {
+        if (xi + xmyi > 1.0) {
+            x2 = x0 + (3.0*G2 - 2.0); y2 = y0 + (3.0*G2 - 1.0);
+            a2 = TW - x2*x2 - y2*y2;
+            if (a2 > 0.0) value += a2*a2*a2*a2 * gradCoord(s, i + (PX << 1), j + PY, x2, y2);
+        } else {
+            x2 = x0 + G2; y2 = y0 + (G2 - 1.0);
+            a2 = TW - x2*x2 - y2*y2;
+            if (a2 > 0.0) value += a2*a2*a2*a2 * gradCoord(s, i, j + PY, x2, y2);
+        }
+        if (yi - xmyi > 1.0) {
+            x2 = x0 + (3.0*G2 - 1.0); y2 = y0 + (3.0*G2 - 2.0);
+            a2 = TW - x2*x2 - y2*y2;
+            if (a2 > 0.0) value += a2*a2*a2*a2 * gradCoord(s, i + PX, j + (PY << 1), x2, y2);
+        } else {
+            x2 = x0 + (G2 - 1.0); y2 = y0 + G2;
+            a2 = TW - x2*x2 - y2*y2;
+            if (a2 > 0.0) value += a2*a2*a2*a2 * gradCoord(s, i + PX, j, x2, y2);
+        }
+    } else {
+        if (xi + xmyi < 0.0) {
+            x2 = x0 + (1.0 - G2); y2 = y0 - G2;
+            a2 = TW - x2*x2 - y2*y2;
+            if (a2 > 0.0) value += a2*a2*a2*a2 * gradCoord(s, i - PX, j, x2, y2);
+        } else {
+            x2 = x0 + (G2 - 1.0); y2 = y0 + G2;
+            a2 = TW - x2*x2 - y2*y2;
+            if (a2 > 0.0) value += a2*a2*a2*a2 * gradCoord(s, i + PX, j, x2, y2);
+        }
+        if (yi < xmyi) {
+            x2 = x0 - G2; y2 = y0 - (G2 - 1.0);
+            a2 = TW - x2*x2 - y2*y2;
+            if (a2 > 0.0) value += a2*a2*a2*a2 * gradCoord(s, i, j - PY, x2, y2);
+        } else {
+            x2 = x0 + G2; y2 = y0 + (G2 - 1.0);
+            a2 = TW - x2*x2 - y2*y2;
+            if (a2 > 0.0) value += a2*a2*a2*a2 * gradCoord(s, i, j + PY, x2, y2);
+        }
+    }
+    return value * 18.24196194486065;
+}
+
 float perlin(int s, float x, float y) {
     int x0 = int(floor(x)), y0 = int(floor(y));
     float xd0 = x - float(x0), yd0 = y - float(y0), xd1 = xd0 - 1.0, yd1 = yd0 - 1.0;
@@ -97,6 +156,7 @@ float gen(int s, float x, float y) {
     if (ntype == 0) return simplex(s, x, y);
     if (ntype == 1) return perlin(s, x, y);
     if (ntype == 2) return value(s, x, y);
+    if (ntype == 4) return simplex2s(s, x, y);
     return cellular(s, x, y);
 }
 
@@ -126,6 +186,6 @@ void main() {
     int idx = p.x * size.y + p.y;
     float f = use_fmap ? fmap[idx] : freq;
     float x = float(p.x) * f, y = float(p.y) * f;
-    if (ntype == 0) { float t = (x + y) * 0.3660254037844386; x += t; y += t; }
+    if (ntype == 0 || ntype == 4) { float t = (x + y) * 0.3660254037844386; x += t; y += t; }
     outv[idx] = fractal(x, y);
 }

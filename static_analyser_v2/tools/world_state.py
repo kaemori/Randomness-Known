@@ -20,9 +20,10 @@ class WorldState:
     fluid: np.ndarray
     biome_override: float
     override_scene_type: object
+    to_do_postinit: bool = True
 
     def __post_init__(self):
-        if self.biome_depth == 0:
+        if self.to_do_postinit and self.biome_depth == 0:
             _rd = self.random_state
             for _ in range(412):
                 xs_value(_rd)
@@ -48,6 +49,7 @@ class WorldState:
             run_settings=run_settings,
             random_state=random_state,
             world_blocks=np.zeros((width, height), dtype=np.uint16),
+            world_buildingentities=[]
             fluid=np.zeros((width, height), dtype=np.uint8),
             # biome_override=float("nan"),
             # biome_override='"theliteralNone"',

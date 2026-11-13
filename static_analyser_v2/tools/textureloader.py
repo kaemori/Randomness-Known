@@ -20,7 +20,7 @@ def get_blockinfo():
             curr_id = int(line.split("=>")[0].strip())
         if "Locale.GetOther" in line:
             blocks[curr_id] = line.split('("')[1].split('")')[0]
-    # {0: 'air', 1: 'lightrock', 2: 'gravel', 3: 'scrappile', 4: 'trashpile', 5: 'concretetile', 6: 'steeltile', 7: 'glass', 8: 'rubber', 9: 'plastic', 10: 'heatresistantalloy', 11: 'wood', 12: 'sand', 13: 'sandstone', 14: 'infinirock', 15: 'clay', 16: 'soil', 17: 'granite', 18: 'marble', 19: 'limestone', 20: 'bricks', 21: 'scaffolding', 22: 'toxirock', 23: 'grass', 24: 'log', 25: 'leaves', 26: 'snow', 27: 'ice', 28: 'thinice', 29: 'powdersnow', 30: 'heavyrock', 31: 'fungus', 32: 'mushroombody', 33: 'mushroomcap', 34: 'copper', 35: 'ilmenite'}
+    # {0: 'air', 1: 'lightrock', 2: 'gravel', 3: 'scrappile', 4: 'trashpile', 5: 'concretetile', 6: 'steeltile', 7: 'glass', 8: 'rubber', 9: 'plastic', 10: 'heatresistantalloy', 11: 'wood', 12: 'sand', 13: 'sandstone', 14: 'infinirock', 15: 'clay', 16: 'soil', 17: 'granite', 18: 'marble', 19: 'limestone', 20: 'bricks', 21: 'scaffolding', 22: 'toxirock', 23: 'grass', 24: 'log', 25: 'leaves', 26: 'snow', 27: 'ice', 28: 'thinice', 29: 'powdersnow', 30: 'heavyrock', 31: 'fungus', 32: 'mushroombody', 33: 'mushroomcap', 34: 'copper', 35: 'ilmenite', 36: 'heatedrock', 37: 'obsidian', 38: 'gabbro',39: 'mantle', 40: 'crimsongrass', 41: 'mush', 42: 'indestructiblealloy'}
     return blocks
 
 
@@ -110,6 +110,13 @@ def copy_entity_images():
             "manualdefibrillator",
             "defibrack",
             "aed",
+        }
+        | {
+            "crystalsmall",
+            "crystalmassive",
+            "crystalmedium",
+            "crystalmini",
+            "crystalbig",
         }
         | {"experimentflesh", "internalorgans"}
         | {"debug_cross"}

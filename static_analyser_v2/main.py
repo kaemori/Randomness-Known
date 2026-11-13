@@ -2,8 +2,12 @@ from pathlib import Path
 from functools import partial
 import time
 
+import numpy as np
+from PIL import Image
+
 from cparser.csfunc import module_init, getfunc_as_tree, getfunc_as_py
 from cparser.transpiler import transpile_method
+from tools.animationcurve import AnimationCurve
 from tools.unity_random import splitmix64
 from tools.unity_shim import Plaything
 from tools.generation_environment import Environment
@@ -15,6 +19,54 @@ from tools import textureloader
 import gc
 
 gc.disable()
+
+iceGenCurve = AnimationCurve.from_tuples(
+    [
+        (0, 0.04369995, -0.05734595, -0.05734595),
+        (0.2, 0.03223076, -0.02508016, -0.02508016),
+        (0.5213115, 0.03974618, -0.003112201, -0.003112201),
+        (1, 0.0437015, 0.05906005, 0.05906005),
+    ]
+)
+
+iceMinGenCurve = AnimationCurve.from_tuples(
+    [
+        (0, 0.001006186, 0.04270955, 0.04270955),
+        (0.04285895, 0.001102524, 0.07020532, 3.843779),
+        (0.4812723, 0.1877913, -0.6817608, -0.6817608),
+        (0.8474102, 0.005548154, -0.1337805, -0.1337805),
+        (0.9992933, 0.002213031, -0.001644637, -0.001644637),
+    ]
+)
+
+
+def load_ice_map(width, height):
+    path = Path(__file__).parent / "casproject" / "Assets" / "Texture2D" / "icemap.png"
+    with Image.open(path) as image:
+        source = np.asarray(image.convert("RGB"), dtype=np.float64)[::-1] / 255.0
+
+    source_height, source_width, _ = source.shape
+    x = np.arange(width, dtype=np.float64) / width * (source_width - 1)
+    y = np.arange(height, dtype=np.float64) / height * (source_height - 1)
+    x0 = np.floor(x).astype(np.intp)
+    y0 = np.floor(y).astype(np.intp)
+    x1 = np.minimum(x0 + 1, source_width - 1)
+    y1 = np.minimum(y0 + 1, source_height - 1)
+    x_weight = (x - x0)[None, :, None]
+    y_weight = (y - y0)[:, None, None]
+
+    top_left = source[y0[:, None], x0[None, :]]
+    top_right = source[y0[:, None], x1[None, :]]
+    bottom_left = source[y1[:, None], x0[None, :]]
+    bottom_right = source[y1[:, None], x1[None, :]]
+    samples = (
+        top_left * (1.0 - x_weight) * (1.0 - y_weight)
+        + top_right * x_weight * (1.0 - y_weight)
+        + bottom_left * (1.0 - x_weight) * y_weight
+        + bottom_right * x_weight * y_weight
+    )
+    return samples.transpose(1, 0, 2)
+
 
 DUMP_DIR = Path("temp_gen")
 DUMP_DIR.mkdir(exist_ok=True)
@@ -44,7 +96,7 @@ run_settings = RunSettings.from_preset_str(
 
 
 world_state = WorldState.create(
-    biome_depth=1 - 1,
+    biome_depth=8 - 1,
     width=1024,
     height=1024,
     chunk_width=16,
@@ -52,10 +104,12 @@ world_state = WorldState.create(
     run_settings=run_settings,
     random_state=unity_random_state,
 )
+iceMap = load_ice_map(world_state.width, world_state.height)
 
 module_init(use_cache=False, write_cache=True)
 # module_init()
 MODULE = "WorldGeneration"
+# print(textureloader.get_blockinfo())
 textureloader.copy_icon_images(textureloader.get_blockinfo())
 textureloader.copy_entity_images()
 
@@ -70,11 +124,28 @@ def gen_terr(env):
                 "UnityEngine.Object.Instantiate(Resources.Load('Special/marbleBackground'), BlockToWorldPos(Vector2Int(num16, num17)), Quaternion.Euler(0.0, 0.0, UnityEngine.Random.value * 360.0))",
                 "xs_next(xs_state)",
             ),
+            ("iceMap.GetPixelBilinear(i / width, num34 / height)", "iceMap[i, num34]"),
+            ("pixelBilinear.r", "pixelBilinear[0]"),
+            ("pixelBilinear.g", "pixelBilinear[1]"),
+            ("pixelBilinear.b", "pixelBilinear[2]"),
+            (
+                "pixelBilinear == Color.green",
+                "pixelBilinear[0] == 0.0 and pixelBilinear[1] == 1.0 and pixelBilinear[2] == 0.0",
+            ),
         ),
     )
-    print(gen_terrain)
+    # print(gen_terrain)
     ns = {}
-    exec(gen_terrain, env.as_dict, ns)
+    exec(
+        gen_terrain,
+        env.as_dict
+        | {
+            "iceGenCurve": iceGenCurve,
+            "iceMinGenCurve": iceMinGenCurve,
+            "iceMap": iceMap,
+        },
+        ns,
+    )
     try:
         ns[func]()
         # print(env.Random._count)
@@ -142,11 +213,11 @@ env = Environment(world_state)
 st = time.time()
 # __import__("cProfile").run("exec(gen_terrain, env.as_dict)", "nya.prof")
 gen_terr(env)
-print(time.time() - st, env.Random._count)
+# print(time.time() - st, env.Random._count)
 
-# from spectra2 import show_world, WorldFile
+from spectra2 import show_world, WorldFile
 
-# show_world(world_state, textureloader.get_blockinfo())
+show_world(world_state, textureloader.get_blockinfo())
 
 
 # WorldFile(

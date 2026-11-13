@@ -2,7 +2,7 @@ from pathlib import Path
 
 import moderngl, numpy as np
 
-OPENSIMPLEX2, PERLIN, VALUE, CELLULAR = range(4)
+OPENSIMPLEX2, PERLIN, VALUE, CELLULAR, OPENSIMPLEX2S = range(5)
 NONE, FBM, RIDGED, PINGPONG = range(4)
 
 RESOURCE_DIR = Path(__file__).parent

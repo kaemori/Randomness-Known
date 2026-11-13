@@ -72,6 +72,27 @@ class Vector2:
         mag = self.magnitude()
         return Vector2(self.x / mag, self.y / mag) if mag != 0 else Vector2(0, 0)
 
+    @property
+    def normalized(self):
+        """please for the love of god use normalize in normal code. this is just a shim."""
+        mag = self.magnitude()
+        return Vector2(self.x / mag, self.y / mag) if mag != 0 else Vector2(0, 0)
+
+    def Normalize(self):
+        """please for the love of god use normalize in normal code. this is just a shim."""
+        mag = self.magnitude()
+        return Vector2(self.x / mag, self.y / mag) if mag != 0 else Vector2(0, 0)
+
+    @staticmethod
+    def Lerp(a, b, t):
+        return a + (b - a) * t
+
+    @staticmethod
+    def SignedAngle(vecfrom, vecto):
+        y = vecfrom.x * vecto.y - vecfrom.y * vecto.x
+        x = vecfrom.dot(vecto)
+        return math.degrees(math.atan2(y, x))
+
     def copy(self):
         return Vector2(self.x, self.y)
 
