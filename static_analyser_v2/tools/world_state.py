@@ -49,7 +49,7 @@ class WorldState:
             run_settings=run_settings,
             random_state=random_state,
             world_blocks=np.zeros((width, height), dtype=np.uint16),
-            world_buildingentities=[]
+            world_buildingentities=[],
             fluid=np.zeros((width, height), dtype=np.uint8),
             # biome_override=float("nan"),
             # biome_override='"theliteralNone"',
