@@ -119,8 +119,7 @@ def DrawLine(env, a, b, thickness, block):
         break
 
 
-def utils_create(path, pos, dir):
-    ...
+def utils_create(path, pos, dir): ...
 
 
 def DrawEmptyLine(env, a, b, thickness):
@@ -167,8 +166,7 @@ class Environment:
         "halfWidth",
         "halfHeight",
         "worldBlocks",
-        "worldBuildingEntities"
-        "fluid",
+        "worldBuildingEntities" "fluid",
         "UnityEngine",
         "random_choice",
         "math",
@@ -257,7 +255,7 @@ class Environment:
         self.SimpleBlockCircle = partial(SimpleBlockCircle, self)
         self.DrawLine = partial(DrawLine, self)
         self.DrawEmptyLine = partial(DrawEmptyLine, self)
-        self.utils_create = 
+        # self.utils_create =
 
         self.GenerateOres = partial(go_fn or GenerateOres, self)
         self.UpdateWorld = partial(uw_fn or UpdateWorld, self)

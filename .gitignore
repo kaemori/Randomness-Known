@@ -504,4 +504,4 @@ casproject*
 
 # no .cs files except for those in unity_hook
 *.cs
-!unity_hook/**/*.cs
+!*/unity_hook/**/*.cs
