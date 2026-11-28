@@ -1,7 +1,7 @@
 <Project>
   <PropertyGroup>
     <!--Set this to your project's name. This influences the .dll's name -->
-    <ProjectName>unrandom</ProjectName>
+    <ProjectName>worldgetter</ProjectName>
 
     <!--If auto-detection misses your install, set this to your game folder.-->
     <!-- E.g. <ManualBaseGamePath>C:\Some\Path\To\Your\Game\Folder</ManualBaseGamePath> -->

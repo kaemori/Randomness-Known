@@ -497,8 +497,10 @@ $RECYCLE.BIN/
 *temp_*
 nya*
 **.pkl
+**.pkg
 # sorry moffs!
-casproject*
+**/casproject/**
+!**/casproject/readme.md
 *CasU-Decompiled*
 .vscode
 
