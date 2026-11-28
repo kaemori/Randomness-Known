@@ -42,6 +42,10 @@ def ensure_fillnet(env):
 
 
 def cached_fill(env, x, y, fill, max_fill):
+    if not isinstance(fill, (int, np.integer)) or not 43 <= fill <= 65535:
+        raise ValueError("liquid tile IDs must be integer values from 43 to 65535")
+    if not 0 <= x < env.width or not 0 <= y < env.height:
+        return False
     ensure_fillnet(env)
     n = int(env.fillnet[x, y])
     if n == 0 or n > max_fill:
@@ -58,6 +62,8 @@ def cached_fill(env, x, y, fill, max_fill):
 
 # liquid fns
 def place_liquids(env, per_chunk, liquid_type, max_fill):
+    if not isinstance(liquid_type, (int, np.integer)) or not 43 <= liquid_type <= 65535:
+        raise ValueError("liquid tile IDs must be integer values from 43 to 65535")
     ensure_fillnet(env)
     half_w, half_h = env.width // 2, env.height // 2
     rand = env.Random

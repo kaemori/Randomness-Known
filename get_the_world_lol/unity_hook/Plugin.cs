@@ -13,8 +13,8 @@ namespace ModNamespace
     [BepInPlugin(ModGUID, ModName, ModVersion)]
     public class Plugin : BaseUnityPlugin
     {
-        public const string ModGUID = "com.rayleigh.urandom";
-        public const string ModName = "unrandom";
+        public const string ModGUID = "com.rayleigh.worldgetter";
+        public const string ModName = "worldgetter";
         public const string ModVersion = "0.0.1";
 
         internal static new ManualLogSource Logger;

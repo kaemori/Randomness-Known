@@ -1,6 +1,7 @@
 import numpy as np
 from js import gpuFnl, Object
 from pyodide.ffi import to_js
+from types import SimpleNamespace
 
 OPENSIMPLEX2, PERLIN, VALUE, CELLULAR, OPENSIMPLEX2S = range(5)
 NONE, FBM, RIDGED, PINGPONG = range(4)
@@ -44,3 +45,17 @@ async def noise(
     js_options = to_js(options, dict_converter=Object.fromEntries)
     result = await gpuFnl.noise(js_options)
     return np.asarray(result.to_py(), dtype="f4").reshape((w, h))
+
+
+pyglslfnl = SimpleNamespace(
+    noise=noise,
+    OPENSIMPLEX2=OPENSIMPLEX2,
+    PERLIN=PERLIN,
+    VALUE=VALUE,
+    CELLULAR=CELLULAR,
+    OPENSIMPLEX2S=OPENSIMPLEX2S,
+    NONE=NONE,
+    FBM=FBM,
+    RIDGED=RIDGED,
+    PINGPONG=PINGPONG,
+)

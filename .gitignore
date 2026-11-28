@@ -498,7 +498,8 @@ $RECYCLE.BIN/
 nya*
 **.pkl
 # sorry moffs!
-casproject*
+**/casproject/**
+!**/casproject/readme.md
 *CasU-Decompiled*
 .vscode
 
