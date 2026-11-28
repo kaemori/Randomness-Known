@@ -1,6 +1,7 @@
 from pathlib import Path
 from functools import lru_cache
 import math
+import json
 import re
 
 import numpy as np
@@ -26,9 +27,18 @@ _STRUCTURE_LOAD = re.compile(
     r"""\s*(?:GameObject\s*,\s*)?(['"])(.*?)\1"""
 )
 
-module_init()
-BLOCKINFO = get_blockinfo()
-GUID_TO_BLOCKID_LOOKUP = texture_guid_lookup(RESOURCES_PATH, BLOCKINFO)
+BLOCKINFO = None
+GUID_TO_BLOCKID_LOOKUP = None
+
+
+def initialize():
+    global BLOCKINFO, GUID_TO_BLOCKID_LOOKUP
+    module_init(
+        decom_path=ASSETS_PATH / "Scripts" / "Assembly-CSharp",
+        cache_path=PROJECT_PATH.parent / ".module_init_cache.pkl",
+    )
+    BLOCKINFO = get_blockinfo()
+    GUID_TO_BLOCKID_LOOKUP = texture_guid_lookup(RESOURCES_PATH, BLOCKINFO)
 
 
 def get_structure_set(genstruct_fn):
@@ -39,6 +49,11 @@ def get_structure_set(genstruct_fn):
         for resource in set(resources)
         if _resource_has_tilemap(resource, PREFABS_PATH)
     }
+
+
+def get_resource_set(genstruct_fn):
+    source = genstruct_fn if isinstance(genstruct_fn, str) else "\n".join(genstruct_fn)
+    return {match[1] for match in _STRUCTURE_LOAD.findall(source)}
 
 
 def _read_prefab(filepath):
@@ -260,12 +275,68 @@ def get_single_prefab(
     if not filepath.is_file():
         raise FileNotFoundError(filepath)
 
+    if guid_to_blockid is None and GUID_TO_BLOCKID_LOOKUP is None:
+        initialize()
     by_fileid = _read_prefab(filepath)
     if guid_to_blockid is None:
         guid_to_blockid = GUID_TO_BLOCKID_LOOKUP
     tilemaps, tilemap_bounds = _extract_tilemaps(by_fileid, guid_to_blockid, filepath)
     entities = _extract_entities(by_fileid, tilemap_bounds, filepath)
     return tilemaps, entities, tilemap_bounds
+
+
+def build_structure_package(resources, output_path):
+    if GUID_TO_BLOCKID_LOOKUP is None:
+        initialize()
+    packaged = {
+        "format": "spectra3-structures-v1",
+        "structures": {},
+    }
+    for resource in sorted(set(resources)):
+        try:
+            tilemaps, entities, bounds = get_single_prefab(resource)
+        except FileNotFoundError:
+            tilemaps, entities, bounds = [], [], []
+        anchor_x, anchor_y = bounds[0] if bounds else (0, 0)
+        packaged["structures"][resource] = {
+            "tilemaps": [
+                {
+                    "tiles": [
+                        [
+                            int(x + tilemap_bounds[0] - anchor_x),
+                            int(y + tilemap_bounds[1] - anchor_y),
+                            int(tilemap[x, y]),
+                        ]
+                        for x in range(tilemap.shape[0])
+                        for y in range(tilemap.shape[1])
+                        if int(tilemap[x, y]) >= 0
+                    ],
+                }
+                for tilemap, tilemap_bounds in zip(tilemaps, bounds)
+            ],
+            "entities": [
+                {
+                    "assetpath": entity.get("id") or entity.get("name"),
+                    "id": entity.get("id"),
+                    "name": entity.get("name"),
+                    "position": entity["position"],
+                    "scale": entity["scale"],
+                    "rotation_deg": entity["rotation_deg"],
+                    "length": entity["length"],
+                }
+                for entity in entities
+            ],
+        }
+
+    if not packaged["structures"]:
+        raise ValueError("No structure resources were found to package")
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        json.dumps(packaged, separators=(",", ":"), sort_keys=True),
+        encoding="utf-8",
+    )
+    return packaged
 
 
 if __name__ == "__main__":
@@ -288,5 +359,6 @@ if __name__ == "__main__":
     #     )
     # )
 
+    initialize()
     tm, blockentities, bounds = get_single_prefab("Structures/MiniPod")
     print(tm, blockentities)

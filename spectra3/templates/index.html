@@ -12,6 +12,14 @@
         <script src="{{ url_for('static', filename='pyodide/pyodide.js') }}"></script>
     </head>
     <body>
+        <label for="layer-select">Layer:</label>
+        <select id="layer-select">
+            {% for layer in range(11) %}
+            <option value="{{ layer }}" {% if layer == 10 %}selected{% endif %}>
+                {{ layer }}
+            </option>
+            {% endfor %}
+        </select>
         <button id="run-btn" disabled>Loading...</button>
         <pre id="output"></pre>
 

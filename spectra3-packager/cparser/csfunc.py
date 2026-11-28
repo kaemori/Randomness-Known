@@ -89,7 +89,10 @@ def module_init(
         else Path().cwd() / "casproject" / "Assets" / "Scripts" / "Assembly-CSharp"
     )
     if not _decompiled_path.exists():
-        raise NotADirectoryError("check yo path")
+        raise NotADirectoryError(
+            f"Decompiled CAS scripts were not found at {_decompiled_path}. "
+            "Place the CAS project's Assets tree in spectra3-packager/casproject."
+        )
     _modules = {file.stem: Path(file) for file in _decompiled_path.glob("*.cs")}
     _module_trees = {}
     _module_index = {}

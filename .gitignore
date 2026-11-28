@@ -497,7 +497,6 @@ $RECYCLE.BIN/
 *temp_*
 nya*
 **.pkl
-**.pkg
 # sorry moffs!
 **/casproject/**
 !**/casproject/readme.md
