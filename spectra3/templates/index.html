@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Spectra 3</title>
+        <link
+            rel="icon"
+            type="image/png"
+            href="{{ url_for('static', filename='favicon.png') }}"
+        />
+        <script src="{{ url_for('static', filename='js/gpu_fnl.js') }}"></script>
+        <script src="{{ url_for('static', filename='pyodide/pyodide.js') }}"></script>
+    </head>
+    <body>
+        <button id="run-btn" disabled>Loading...</button>
+        <pre id="output"></pre>
+
+        <script
+            id="py-loader"
+            src="{{ url_for('static', filename='js/bootstrap.js') }}"
+            data-index-url="{{ url_for('static', filename='pyodide/') }}"
+            data-entry-script="{{ url_for('static', filename='py/main.py') }}"
+            data-pkg-url="{{ url_for('static', filename='py/terrgen.pkg') }}"
+            defer
+        ></script>
+    </body>
+</html>
